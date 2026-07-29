@@ -1,0 +1,164 @@
+---
+title: "Emulator Settings: Input, Speed, and Display"
+sidebarTitle: "Settings"
+description: "Configure keyboard shortcuts, emulation speed, mouse input mode, trackpad support, and screen scaling quality from the Settings dialog."
+---
+
+The Settings dialog lets you tune how Infinite Mac handles keyboard input, emulation speed, mouse movement, and display scaling. Changes take effect immediately and are persisted in your browser's local storage so they apply to future sessions automatically. You can also pre-configure settings via a URL parameter to share a specific configuration with others.
+
+## Opening the Settings dialog
+
+Click the **Settings** button in the emulator chrome (the toolbar below the Mac screen). The dialog opens as an overlay on top of the running emulator.
+
+## Input settings
+
+### Swap Control and Command Keys
+
+When enabled, the host **Control** key is sent to the emulator as **Command**, and vice versa. This makes common Mac shortcuts — **Command-W**, **Command-Q**, **Command-Shift-3** — easier to trigger on keyboards where those combinations are intercepted by the host operating system or browser.
+
+```json
+{ "swapControlAndCommand": true }
+```
+
+### Use relative mouse movements
+
+<Note>
+  This setting is only available for **Basilisk II**, **SheepShaver**, and **Snow** emulators. It does not appear in the Settings dialog for other emulator types.
+</Note>
+
+When enabled, the emulator receives raw mouse *delta* values (relative movement) rather than absolute cursor coordinates. Relative mode is particularly useful for games that use mouse input for aiming or continuous movement, such as Apeiron, where absolute-position tracking can feel imprecise.
+
+If you toggle this setting on **Snow**, a warning will appear indicating that a page reload is required for the change to take effect.
+
+```json
+{ "useMouseDeltas": true }
+```
+
+### Trackpad mode
+
+Trackpad mode adjusts mouse handling to be more comfortable on touch screens and trackpads. When active, click gestures are interpreted differently to make it easier to position the cursor and click without accidentally dragging. The **Trackpad** button also appears in the emulator chrome on touch devices.
+
+<Note>
+  On emulators that always require relative mouse input (DingusPPC, Previous, PearPC), trackpad mode is automatically active and the **Use relative mouse movements** checkbox is hidden.
+</Note>
+
+```json
+{ "trackpadMode": true }
+```
+
+## Speed settings
+
+<Note>
+  Speed controls are only available for **Mini vMac**, **Basilisk II**, and **Snow**. DingusPPC, SheepShaver, Previous, and PearPC do not expose a speed setting.
+</Note>
+
+The speed setting controls how fast the emulated CPU runs relative to real time. Very old software may be timing-dependent, so running too fast can cause glitches in animations, audio, or copy-protection routines.
+
+<Tabs>
+  <Tab title="Mini vMac / Basilisk II speeds">
+    | Value | Label |
+    |---|---|
+    | `-2` | Default (recommended) |
+    | `0` | 1× |
+    | `1` | 2× |
+    | `2` | 4× |
+    | `3` | 8× |
+    | `4` | 16× |
+    | `5` | 32× |
+    | `-1` | All Out |
+
+    The default (`-2`) uses the speed the emulator was built with. **All Out** (`-1`) removes any governor and runs as fast as the host can manage.
+  </Tab>
+  <Tab title="Snow speeds">
+    | Value | Label |
+    |---|---|
+    | `-2` | Accurate |
+    | `7` | Dynamic |
+    | `-1` | Uncapped |
+    | `9` | Video |
+
+    **Accurate** matches real hardware timing. **Dynamic** adjusts speed to balance accuracy and performance. **Uncapped** runs as fast as possible. **Video** targets smooth video playback frame rates.
+  </Tab>
+</Tabs>
+
+```json
+{ "speed": -1 }
+```
+
+## Screen scaling
+
+Controls the interpolation algorithm used when the emulated screen is displayed at a size larger than its native resolution.
+
+| Option | Behaviour |
+|---|---|
+| `auto` | Smooth scaling when the screen is displayed at a non-integer multiple of its native size; crisp (pixelated) scaling at integer multiples. |
+| `smooth` | Bilinear interpolation. Edges are anti-aliased, giving a softer appearance. |
+| `pixelated` | Nearest-neighbour scaling. Individual pixels remain sharp and blocky. |
+
+```json
+{ "screenScaling": "pixelated" }
+```
+
+## Storage section (Saved HD)
+
+When a session includes the **Saved HD** disk, the Settings dialog shows a **Saved HD** section with the following controls:
+
+<CardGroup cols={2}>
+  <Card title="Export" icon="download">
+    Shuts down the Mac and downloads the Saved HD as an `.infinitemacdisk` file. Use this to back up your data or move it to another browser.
+  </Card>
+  <Card title="Import" icon="upload">
+    Overwrites the current Saved HD with a previously exported `.infinitemacdisk` file.
+  </Card>
+  <Card title="Save Disk Image" icon="save">
+    Downloads the Saved HD as a `.dsk` or `.hda` (device image) file compatible with other classic Mac emulators.
+  </Card>
+  <Card title="Reset" icon="rotate-ccw">
+    Clears all contents of the Saved HD and restarts the Mac.
+  </Card>
+</CardGroup>
+
+The **Persistence** row shows whether the browser has committed to keeping the Saved HD data even under storage pressure:
+
+- **Persistent** — the browser will not evict this data.
+- **Transient** — data may be evicted if the device runs low on storage.
+
+Click **Request Persistence** to ask the browser to upgrade transient storage to persistent.
+
+## The `settings` URL parameter
+
+You can pre-configure any combination of emulator settings by passing a JSON-encoded `EmulatorSettings` object as the `settings` query parameter. This is especially useful for shared links and embedded sessions.
+
+```typescript
+type EmulatorSettings = {
+    swapControlAndCommand: boolean;
+    speed: EmulatorSpeed;       // see speed values above
+    useMouseDeltas: boolean;
+    trackpadMode: boolean;
+    screenScaling?: "auto" | "smooth" | "pixelated";
+};
+```
+
+### Examples
+
+Swap Control and Command, and run at maximum speed:
+
+```
+https://infinitemac.org/1984/System%201.0?settings={"swapControlAndCommand":true,"speed":-1}
+```
+
+Use pixelated scaling for crisp pixel art:
+
+```
+https://infinitemac.org/1991/System%207.0?settings={"screenScaling":"pixelated"}
+```
+
+Enable relative mouse movement for a game session:
+
+```
+https://infinitemac.org/1994/System%207.5?settings={"useMouseDeltas":true}
+```
+
+<Tip>
+  When using the `settings` parameter in an embedded session (`/embed`), the `EmulatorSettings` defaults from `DEFAULT_EMULATOR_SETTINGS` are always applied first, then overridden by your JSON. This means you only need to specify the keys you want to change.
+</Tip>

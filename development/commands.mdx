@@ -1,0 +1,162 @@
+---
+title: "npm Run Scripts: Development and Import Commands"
+sidebarTitle: "Commands"
+description: "Reference for every npm run script in Infinite Mac: starting the dev server, importing disks and libraries, building, and running lint and type checks."
+---
+
+All development tasks in Infinite Mac are driven through `npm run`. The scripts are defined in `package.json` and delegate to shell scripts under `scripts/` or to Python programs invoked via `uv run`. The sections below group every script by purpose.
+
+## Development Server
+
+### `start`
+
+```bash
+npm run start
+```
+
+Launches the Vite development server via `scripts/start-dev.sh`. The app is served at **http://localhost:3127** with `Cross-Origin-Opener-Policy: same-origin` and `Cross-Origin-Embedder-Policy: require-corp` headers set automatically so that `SharedArrayBuffer` works without additional configuration.
+
+### `preview`
+
+```bash
+npm run preview
+```
+
+Serves the pre-built assets from the `build/` directory using Vite's preview server. Runs at **https://localhost:4127** (TLS is provided by `@vitejs/plugin-basic-ssl`). Requires a prior `npm run build`.
+
+### `worker-dev`
+
+```bash
+npm run worker-dev
+```
+
+Starts a local Cloudflare Worker preview using `wrangler dev --port=3128`. The result is accessible at **http://localhost:3128**. Requires a separate `npm run build` invocation before running, since wrangler serves the pre-built assets from `build/`.
+
+## Building
+
+### `build`
+
+```bash
+npm run build
+```
+
+Runs `vite build` and outputs the compiled app into the `build/` directory. The same output is used for local preview (`preview`) and Cloudflare Worker deployment (`worker-deploy`). The `worker-deploy` script sets `CLOUDFLARE_ENV=production` before invoking Vite to enable the production-only R2 bucket bindings and CDN cache configuration defined in `wrangler.jsonc`.
+
+## Importing Data
+
+### `import-disks [minimal|placeholder]`
+
+```bash
+npm run import-disks
+npm run import-disks minimal
+npm run import-disks placeholder
+```
+
+Builds disk images for serving. Copies base OS images for each supported emulator, chunks them, and generates a disk manifest. When run without arguments the full import runs, including populating the "Infinite HD" disk image from the `Library/` directory.
+
+- `minimal` — builds System 1 through System 7.5.5 only and skips populating Infinite HD, providing a fast path for development
+- `placeholder` — builds System 1 through 7.5.5 only (same as `minimal`); this flag name appears in the README as an alias for the fast subset
+
+<Info>
+  This script calls the native macOS Mini vMac and Basilisk II binaries as a final step to validate the desktop database on the generated disk. If they are not installed, a warning is logged and the disk may take longer to mount in the emulator.
+</Info>
+
+### `import-cd-roms [placeholder] [--sync-media]`
+
+```bash
+npm run import-cd-roms
+npm run import-cd-roms placeholder
+npm run import-cd-roms -- --sync-media
+```
+
+Builds the CD-ROM and floppy disk library. Most CD-ROMs are hosted on external sites; floppies and local media are self-hosted in the Cloudflare R2 bucket.
+
+- `placeholder` — creates an empty CD-ROM library stub so the app runs without errors during development
+- `--sync-media` — syncs self-hosted media files to the Cloudflare R2 bucket; this is separate from the disk image sync performed by `sync-disks`
+
+### `import-library [placeholder]`
+
+```bash
+npm run import-library
+npm run import-library placeholder
+```
+
+Builds the Macintosh Garden downloads library. Actual downloads are hosted on `macintoshgarden.org` and other sites; the library contains only metadata.
+
+- `placeholder` — generates a minimal library that does not require a local Macintosh Garden data dump, suitable for development
+
+### `import-emulator <emulator>`
+
+```bash
+npm run import-emulator basiliskii
+npm run import-emulator minivmac-Plus
+```
+
+Copies the compiled WebAssembly output from an emulator submodule into `src/emulator/worker/emscripten/`. Only necessary when modifying an emulator core and rebuilding it from source. The following emulator targets are supported:
+
+| Target | Source |
+|---|---|
+| `basiliskii` | `macemu/BasiliskII/src/Unix` |
+| `sheepshaver` | `macemu/SheepShaver/src/Unix` |
+| `minivmac-Plus` | `minivmac/` |
+| `minivmac-128K` | `minivmac/` |
+| `minivmac-512Ke` | `minivmac/` |
+| `minivmac-SE` | `minivmac/` |
+| `minivmac-II` | `minivmac/` |
+| `minivmac-IIx` | `minivmac/` |
+| `dingusppc` | `dingusppc/build/bin` |
+| `previous` | `previous/build/src` |
+| `pearpc` | `pearpc/src` |
+| `snow` | `snow/target/wasm32-unknown-emscripten/release` |
+
+## Deployment
+
+### `worker-deploy`
+
+```bash
+npm run worker-deploy
+```
+
+Runs `scripts/worker-deploy.sh`, which performs a TypeScript check (`tsc --noEmit`) on both the app and worker tsconfigs, then runs `vite build` with `CLOUDFLARE_ENV=production`, and finally calls `wrangler deploy` to push the Worker to Cloudflare.
+
+### `sync-disks`
+
+```bash
+npm run sync-disks
+```
+
+Runs `scripts/sync-disks.sh`, which uses [rclone](https://rclone.org/) to sync the chunked disk images from `Images/build` to the `infinite-mac-disk` Cloudflare R2 bucket. Requires `rclone` to be installed and configured via `scripts/rclone.conf`.
+
+## Code Quality
+
+### `prettier`
+
+```bash
+npm run prettier
+```
+
+Auto-formats all files under `src/` and `worker/` with [Prettier](https://prettier.io/) using the project configuration in `package.json` (4-space indentation, ES5 trailing commas, double quotes, no bracket spacing).
+
+### `lint`
+
+```bash
+npm run lint
+```
+
+Runs ESLint with `--fix` over `src/` and `worker/`. The ESLint config enforces TypeScript-aware rules via `@typescript-eslint` and React Hooks lint rules.
+
+### `check`
+
+```bash
+npm run check
+```
+
+Runs two TypeScript type checks in sequence — one for the main app (`tsconfig.json`) and one for the Cloudflare Worker (`worker/tsconfig.json`) — with `--noEmit` so no output files are written. Both must pass for the check to succeed.
+
+### `format-macemu`
+
+```bash
+npm run format-macemu
+```
+
+Runs `clang-format -i` over all files matching `macemu/BasiliskII/src/Unix/JS/*`, formatting the Basilisk II JavaScript glue files to the project's C/C++ style.

@@ -1,0 +1,100 @@
+---
+title: "Infinite Mac: Classic Mac Emulation in the Browser"
+sidebarTitle: "Introduction"
+description: "Infinite Mac runs classic Mac OS from System 1 through Mac OS X 10.4 and NeXTSTEP in any modern browser, powered by WebAssembly emulator cores."
+---
+
+Infinite Mac brings 80s, 90s, and early 2000s classic Macintosh computers to life directly in your browser — no installation, no plugins, no waiting. Every session loads instantly from a curated library of OS releases and software, all powered by real hardware emulators compiled to WebAssembly. The full collection lives at [infinitemac.org](https://infinitemac.org).
+
+<Note>
+  Infinite Mac is an open-source project released under the **Apache-2.0 license**. The source code is available at [github.com/mihaip/infinite-mac](https://github.com/mihaip/infinite-mac). Contributions, bug reports, and forks are welcome.
+</Note>
+
+## Supported Operating Systems
+
+Infinite Mac spans the entire classic Macintosh era, from the very first System Software shipped with the original 128K Mac in 1984 all the way through Mac OS X 10.4 Tiger in the mid-2000s. NeXTSTEP — the operating system that eventually became the foundation of macOS — is supported across all major releases as well.
+
+| Era | Operating Systems |
+|-----|-------------------|
+| Early Macintosh | System 1.0 – System 6.0.8 |
+| System 7 era | System 7.0 – System 7.6.1, KanjiTalk 7.5.3 |
+| Mac OS 8 & 9 | Mac OS 8.0 – Mac OS 9.2.2 |
+| Mac OS X | Mac OS X 10.0 – 10.4 |
+| NeXT | NeXTSTEP 0.8 – OPENSTEP 4.2 |
+
+## Emulator Cores
+
+Seven distinct emulator engines cover the full hardware range, each compiled to WebAssembly via Emscripten (or in Snow's case, via the Rust `wasm32-unknown-emscripten` target):
+
+| Emulator | CPUs Covered | Typical Use |
+|----------|-------------|-------------|
+| **Mini vMac** | 68000, 68020, 68030 | Mac 128K through Mac IIx (System 1–7) |
+| **Snow** | 68000, 68020, 68030 | Alternate 68K core with SCSI support |
+| **Basilisk II** | 68030, 68040 | Mac IIfx, Quadra 650 (System 7–Mac OS 8) |
+| **SheepShaver** | PowerPC 601, G3 | Power Macintosh 9500, G3 Blue & White (Mac OS 9) |
+| **DingusPPC** | PowerPC 601, G3 | Power Macintosh 6100, 7500, G3 Beige, iMac G3 |
+| **PearPC** | G3 (running G4 ROM) | Power Macintosh G4 PCI Graphics (Mac OS X) |
+| **Previous** | 68030, 68040 | NeXT Computer, NeXTcube, NeXTstation |
+
+## Key Features
+
+**Infinite HD library** — A large pre-populated hard disk image containing thousands of classic Mac applications, games, and utilities, automatically available when you boot any supported system disk.
+
+**CD-ROM library** — Browse and mount dozens of classic CD-ROM titles directly from the browser. You can also mount arbitrary CD-ROM images from archive.org and other sources by URL.
+
+**Macintosh Garden integration** — A software library drawer (added November 2024) pulls metadata from Macintosh Garden, letting you download and run software directly from within the emulated environment.
+
+**Saved HD persistence** — A personal writable disk image stored in the browser's [Origin Private File System](https://developer.mozilla.org/en-US/docs/Web/API/File_System_API/Origin_private_file_system), so your files survive across sessions.
+
+**File drag-and-drop** — Drag files from your host machine into the emulator window to upload them. Drag files back out to download them, preserving resource forks via AppleDouble encoding.
+
+**AppleTalk networking** — Two or more Infinite Mac sessions (using Basilisk II or SheepShaver) can join the same named AppleTalk zone to share files over the network, powered by Cloudflare Durable Objects.
+
+**Embed API** — Infinite Mac instances can be embedded in other websites via an `<iframe>` pointing to `infinitemac.org/embed`, with URL parameters controlling the machine, disk, and display options.
+
+**Bookmarkable sessions** — Every configuration — machine model, OS, extra disks, screen size, RAM, AppleTalk zone — is encoded into the page URL, making it trivial to share or link to an exact setup.
+
+## Shortcut Domains
+
+Popular OS versions have their own dedicated domains for quick access:
+
+| Domain | System |
+|--------|--------|
+| [system6.app](https://system6.app) | System 6 |
+| [system7.app](https://system7.app) | System 7 |
+| [macos8.app](https://macos8.app) | Mac OS 8 |
+| [macos9.app](https://macos9.app) | Mac OS 9 |
+| [kanjitalk7.app](https://kanjitalk7.app) | KanjiTalk 7.5.3 (Japanese) |
+
+## Explore the Docs
+
+<CardGroup cols={2}>
+  <Card
+    title="Quickstart"
+    icon="rocket"
+    href="/quickstart"
+  >
+    Clone the repo, import disk images, and run the local development server in a few commands.
+  </Card>
+  <Card
+    title="Architecture"
+    icon="layer-group"
+    href="/architecture"
+  >
+    Understand how emulator cores, Cloudflare Workers, and chunked R2 disk images fit together.
+  </Card>
+  <Card
+    title="Embedding"
+    icon="code"
+    href="https://blog.persistent.info/2025/07/infinite-mac-embedding.html"
+  >
+    Embed a live Mac emulator directly in your own website using the iframe embed API.
+  </Card>
+  <Card
+    title="Custom Instances"
+    icon="sliders"
+    href="https://infinitemac.org/run"
+  >
+    Build a custom configuration with any combination of system disk, machine, RAM, and extra disks.
+  </Card>
+</CardGroup>

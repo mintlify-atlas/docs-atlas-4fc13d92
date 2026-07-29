@@ -1,0 +1,277 @@
+---
+title: "postMessage API for Embedded Emulator Control"
+sidebarTitle: "postMessage API"
+description: "Send commands to an embedded Infinite Mac emulator and receive status events using the browser's window.postMessage API."
+---
+
+The embedded Infinite Mac emulator supports two-way communication with the parent page through the browser's standard [`window.postMessage`](https://developer.mozilla.org/en-US/docs/Web/API/Window/postMessage) API. You can send control commands to the emulator (pause, keyboard/mouse input, disk loading) and listen for status notifications (boot complete, screen updates).
+
+The full TypeScript definitions for both directions live in [`src/embed-types.ts`](https://github.com/mihaip/infinite-mac/blob/main/src/embed-types.ts).
+
+---
+
+## Basic Send / Receive Pattern
+
+```javascript
+// Get a reference to the iframe
+const iframe = document.getElementById("my-mac");
+
+// Send a command TO the emulator
+iframe.contentWindow.postMessage({ type: "emulator_pause" }, "*");
+
+// Receive notifications FROM the emulator
+window.addEventListener("message", (event) => {
+  switch (event.data.type) {
+    case "emulator_loaded":
+      console.log("Mac has finished booting!");
+      break;
+    case "emulator_screen":
+      const { data, width, height } = event.data;
+      console.log(`Screen frame: ${width}×${height}`);
+      break;
+  }
+});
+```
+
+---
+
+## Sending Messages — `EmbedControlEvent`
+
+### `emulator_pause`
+
+Pause the emulator. Useful for reducing CPU and GPU usage when the user is not actively interacting with the embed. See also the [`paused`](/embedding/iframe-parameters#playback-control) and [`auto_pause`](/embedding/iframe-parameters#playback-control) URL parameters for automatic pause behaviour.
+
+```typescript
+{ type: "emulator_pause" }
+```
+
+```javascript
+iframe.contentWindow.postMessage({ type: "emulator_pause" }, "*");
+```
+
+---
+
+### `emulator_unpause`
+
+Resume a paused emulator.
+
+```typescript
+{ type: "emulator_unpause" }
+```
+
+```javascript
+iframe.contentWindow.postMessage({ type: "emulator_unpause" }, "*");
+```
+
+---
+
+### `emulator_mouse_move`
+
+Send a mouse movement event. The coordinate semantics depend on the underlying emulator:
+
+- **Absolute coordinates** (`x`, `y`) — supported by Mini vMac, Basilisk II, and SheepShaver.
+- **Relative coordinates** (`deltaX`, `deltaY`) — used by Previous, DingusPPC, and PearPC.
+
+You should always supply all four fields; each emulator will read the ones it supports.
+
+```typescript
+{
+  type: "emulator_mouse_move";
+  x: number;       // absolute X position
+  y: number;       // absolute Y position
+  deltaX: number;  // relative X delta
+  deltaY: number;  // relative Y delta
+}
+```
+
+```javascript
+// Move to absolute position (320, 240) / relative (+2, +4)
+iframe.contentWindow.postMessage(
+  { type: "emulator_mouse_move", x: 320, y: 240, deltaX: 2, deltaY: 4 },
+  "*"
+);
+```
+
+---
+
+### `emulator_mouse_down` / `emulator_mouse_up`
+
+Send a mouse button press or release. `button` follows the same numbering as [`MouseEvent.button`](https://developer.mozilla.org/en-US/docs/Web/API/MouseEvent/button): `0` = left, `2` = right.
+
+Right-click (`button: 2`) is only supported by certain emulator and OS combinations — specifically Previous, and DingusPPC running Mac OS X.
+
+```typescript
+{
+  type: "emulator_mouse_down" | "emulator_mouse_up";
+  button: number;  // 0 = left, 2 = right
+}
+```
+
+```javascript
+// Left click
+iframe.contentWindow.postMessage({ type: "emulator_mouse_down", button: 0 }, "*");
+iframe.contentWindow.postMessage({ type: "emulator_mouse_up",   button: 0 }, "*");
+
+// Right click (Previous / DingusPPC + Mac OS X only)
+iframe.contentWindow.postMessage({ type: "emulator_mouse_down", button: 2 }, "*");
+iframe.contentWindow.postMessage({ type: "emulator_mouse_up",   button: 2 }, "*");
+```
+
+---
+
+### `emulator_key_down` / `emulator_key_up`
+
+Send a physical key press or release. The `code` property uses the same values as the [`KeyboardEvent.code`](https://developer.mozilla.org/en-US/docs/Web/API/KeyboardEvent/code) property — for example `"KeyA"`, `"ArrowLeft"`, `"MetaLeft"`, `"Enter"`.
+
+```typescript
+{
+  type: "emulator_key_down" | "emulator_key_up";
+  code: string;  // KeyboardEvent.code value
+}
+```
+
+```javascript
+// Type the letter "A"
+iframe.contentWindow.postMessage({ type: "emulator_key_down", code: "KeyA" }, "*");
+iframe.contentWindow.postMessage({ type: "emulator_key_up",   code: "KeyA" }, "*");
+```
+
+<Note>
+  See [`src/emulator/common/key-codes.ts`](https://github.com/mihaip/infinite-mac/blob/main/src/emulator/common/key-codes.ts)
+  for the full list of key codes recognised by the emulator.
+</Note>
+
+---
+
+### `emulator_load_disk`
+
+Load a disk image from a URL into the running emulator. The `url` must point to an uncompressed disk image file (`.dsk`, `.img`, `.iso`, `.toast`, etc.).
+
+Supported emulators: **Mini vMac, Basilisk II, SheepShaver, Previous**.
+
+```typescript
+{
+  type: "emulator_load_disk";
+  url: string;  // URL to an uncompressed disk image
+}
+```
+
+```javascript
+iframe.contentWindow.postMessage(
+  { type: "emulator_load_disk", url: "https://example.com/my-app.dsk" },
+  "*"
+);
+```
+
+---
+
+## Receiving Messages — `EmbedNotificationEvent`
+
+### `emulator_loaded`
+
+Fired once when the emulator has finished loading all of its data files and the emulated machine has begun running. This is the earliest point at which it is safe to send input events.
+
+```typescript
+{ type: "emulator_loaded" }
+```
+
+```javascript
+window.addEventListener("message", (event) => {
+  if (event.data.type === "emulator_loaded") {
+    console.log("Emulator is ready.");
+  }
+});
+```
+
+---
+
+### `emulator_screen`
+
+Fired on every frame when the screen contents change. The `data` field is a `Uint8ClampedArray` containing raw pixel data in RGBA format (4 bytes per pixel, row-major order). `width` and `height` give the dimensions of the frame.
+
+```typescript
+{
+  type: "emulator_screen";
+  data: Uint8ClampedArray;
+  width: number;
+  height: number;
+}
+```
+
+```javascript
+window.addEventListener("message", (event) => {
+  if (event.data.type === "emulator_screen") {
+    const { data, width, height } = event.data;
+    // e.g. paint onto a canvas
+    const imageData = new ImageData(data, width, height);
+    ctx.putImageData(imageData, 0, 0);
+  }
+});
+```
+
+<Warning>
+  `emulator_screen` events are only emitted when the
+  [`screen_update_messages=true`](/embedding/iframe-parameters#screen) URL
+  parameter is set on the embed URL. Without it, no screen frames are sent to
+  the parent page.
+</Warning>
+
+---
+
+## Complete Working Example
+
+The page below embeds a System 7.1 Quadra 650, logs a message when the machine finishes booting, and automatically pauses the emulator after 5 seconds.
+
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Infinite Mac postMessage Demo</title>
+</head>
+<body>
+  <iframe
+    id="my-mac"
+    src="https://infinitemac.org/embed?disk=System+7.1&machine=Quadra+650&screenSize=640x480"
+    width="640"
+    height="480"
+    allow="cross-origin-isolated"
+    frameborder="0">
+  </iframe>
+
+  <script>
+    const iframe = document.getElementById("my-mac");
+
+    // 1. Listen for notifications from the emulator
+    window.addEventListener("message", (event) => {
+      switch (event.data.type) {
+        case "emulator_loaded":
+          console.log("Mac has finished booting and is now running.");
+          break;
+      }
+    });
+
+    // 2. Pause the emulator after 5 seconds
+    setTimeout(() => {
+      console.log("Sending pause command…");
+      iframe.contentWindow.postMessage({ type: "emulator_pause" }, "*");
+    }, 5000);
+  </script>
+</body>
+</html>
+```
+
+<Steps>
+  <Step title="Create the iframe">
+    Point the `src` at the `/embed` endpoint with your chosen disk, machine, and
+    screen size parameters.
+  </Step>
+  <Step title="Listen for emulator_loaded">
+    Attach a `message` listener on `window` and branch on `event.data.type`.
+    Wait for `emulator_loaded` before sending any input commands.
+  </Step>
+  <Step title="Send control messages">
+    Use `iframe.contentWindow.postMessage(payload, "*")` to send any of the
+    `EmbedControlEvent` payloads documented above.
+  </Step>
+</Steps>

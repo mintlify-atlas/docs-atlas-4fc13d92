@@ -1,0 +1,109 @@
+---
+title: "Navigating the Infinite Mac Disk Browser"
+sidebarTitle: "Disk Browser"
+description: "Browse and launch classic Mac OS releases by year, filter for notable releases, and access the CD-ROM library and Macintosh Garden software drawer."
+---
+
+The Infinite Mac browser is the starting point for every session. It presents every classic Macintosh and NeXT system release in a scrollable grid sorted by year, from the mid-1980s through the early 2000s. Each tile renders a miniature bezel that matches the era of the machine — compact Macs for the early years, Platinum-style bezels for System 7, and Pinstripes for Mac OS 9 and beyond. Click any tile to launch that release immediately with sensible defaults, or use the **Customize…** button on the tile to open the custom configuration dialog first.
+
+## Release filters
+
+<CardGroup cols={2}>
+  <Card title="Notable" icon="star">
+    The default view. Shows a curated subset of landmark releases — major System Software versions, milestone Mac OS releases, and significant NeXT builds. This is the best place to start if you want a quick overview of the platform's history.
+  </Card>
+  <Card title="All" icon="list">
+    Every disk image in the library, including minor point releases, localized builds, and preview versions. Use this when you need a specific version that does not appear in the Notable list.
+  </Card>
+  <Card title="NeXT" icon="cube">
+    Filters to NeXT platform releases, powered by the Previous emulator. Includes NeXTStep and OPENSTEP builds.
+  </Card>
+  <Card title="Mac OS X" icon="apple">
+    Filters to Mac OS X developer previews and early releases, powered by PearPC and DingusPPC.
+  </Card>
+</CardGroup>
+
+The filter selection is saved in your browser so that it persists across visits. You can also force a specific filter via the `?filter=` query parameter (e.g. `?filter=all`, `?filter=notable`, `?filter=next`, `?filter=macosx`).
+
+## Launching a disk
+
+Clicking the **Run** button on any disk tile immediately starts the emulator with:
+
+- The selected system disk as the boot volume.
+- The **Infinite HD** disk, which contains a large collection of software representative of that era.
+- The **Saved HD** disk, a persistent 1 GB volume whose contents are preserved across visits (when your browser supports it).
+- The **Macintosh Garden** library drawer enabled.
+
+To open a disk in a new browser window instead, middle-click, or hold **Cmd** (macOS) / **Ctrl** (Windows/Linux) while clicking **Run**.
+
+## URL structure
+
+Each standard release has a canonical URL in the format `/<year>/<disk-name>`:
+
+```
+https://infinitemac.org/1984/System%201.0
+https://infinitemac.org/1991/System%207.0
+https://infinitemac.org/1997/Mac%20OS%208
+https://infinitemac.org/1999/Mac%20OS%209.0
+```
+
+You can bookmark or share these URLs directly. The emulator will start immediately when a year/disk path is detected.
+
+### Shortcut domains
+
+Popular releases also have dedicated shortcut domains:
+
+| Domain | Release |
+|---|---|
+| [system6.app](https://system6.app) | System Software 6 |
+| [system7.app](https://system7.app) | System 7 |
+| [kanjitalk7.app](https://kanjitalk7.app) | KanjiTalk 7 |
+| [macos8.app](https://macos8.app) | Mac OS 8 |
+| [macos9.app](https://macos9.app) | Mac OS 9 |
+
+## The Macintosh Garden library drawer
+
+Every emulator session includes a **Macintosh Garden** drawer in the sidebar (available when the machine supports file loading). The drawer connects to the [Macintosh Garden](https://macintoshgarden.org/) software archive and lets you browse and install classic Macintosh games and applications without leaving the browser.
+
+<Steps>
+  <Step title="Open the drawer">
+    Click the **Macintosh Garden** icon in the emulator chrome to expand the library panel.
+  </Step>
+  <Step title="Search or browse">
+    Use the search box to filter by title, author, year, category, system requirement, or architecture. Supported operators include `year:`, `title:`, `author:`, `category:`, `system:`, and `architecture:`.
+  </Step>
+  <Step title="Load a file">
+    Click any item to see its details and screenshots, then click **Load** to download it directly into the **Downloads** folder on "The Outside World" disk inside the emulator.
+  </Step>
+</Steps>
+
+<Note>
+  The Macintosh Garden library drawer is only available on emulators that support the Downloads folder: **Basilisk II**, **SheepShaver**, and **DingusPPC** with BlueSCSI Toolbox enabled.
+</Note>
+
+## The CD-ROM library drawer
+
+The **CD-ROMs** drawer gives you access to curated disc images that can be mounted into the running emulator at any time — useful for large software packages that are too big to pre-install on Infinite HD.
+
+<Steps>
+  <Step title="Open the CD-ROMs drawer">
+    Click the CD-ROM icon in the emulator chrome.
+  </Step>
+  <Step title="Browse or filter">
+    Disc images are grouped by category. Use the **Filter…** box to narrow the list by name.
+  </Step>
+  <Step title="Mount a disc">
+    Click any disc tile to mount it. The disc will appear on the Mac desktop within a few seconds.
+  </Step>
+  <Step title="Load from URL">
+    Click **Load from URL…** to mount a disc image from a supported external site. Raw `.iso`, `.img`, `.toast`, or `.bin` files are supported from sites including `archive.org`, `macintoshgarden.org`, and `macintoshrepository.org`.
+  </Step>
+</Steps>
+
+<Note>
+  CD-ROM support is available for most emulators except DingusPPC (when not using BlueSCSI) and PearPC. The Snow emulator also requires SCSI support (`hasSCSI`) to mount discs.
+</Note>
+
+## Custom configuration
+
+At the bottom of the disk grid, under the current year, sits a **Custom** tile. Clicking its **Run…** button opens the custom configuration dialog, which lets you combine any system disk, machine model, RAM size, screen resolution, and external disk images into a bespoke session. You can also reach this dialog directly by navigating to `/run`. See [Custom Configuration](/using/custom-configuration) for full details.

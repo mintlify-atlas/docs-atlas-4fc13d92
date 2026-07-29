@@ -1,0 +1,178 @@
+---
+title: "EmbedControlEvent: Commands for Embedded Emulators"
+sidebarTitle: "Control Events"
+description: "All postMessage event types you can send to an embedded Infinite Mac emulator: pause, mouse, keyboard, and disk loading commands."
+---
+
+The `EmbedControlEvent` type, defined in [`src/embed-types.ts`](https://github.com/mihaip/infinite-mac/blob/main/src/embed-types.ts), describes every message payload you can send to an embedded Infinite Mac iframe via the `postMessage` API. Each event carries a `type` field that identifies the command, plus any additional fields required by that command.
+
+## Sending a control event
+
+Obtain a reference to the iframe element and call `postMessage` on its `contentWindow`. The second argument is the target origin — using `"*"` is convenient during development, but you should restrict it to `"https://infinitemac.org"` in production.
+
+```javascript
+const iframe = document.getElementById('mac');
+iframe.contentWindow.postMessage({ type: 'emulator_pause' }, '*');
+```
+
+---
+
+## `emulator_pause`
+
+Pauses CPU execution of the emulated machine. While paused the emulator stops consuming CPU time on the host, making it useful for conserving resources when the user is not interacting with the iframe — for example when it is scrolled out of view or hidden behind another element.
+
+The companion `paused=true` and `auto_pause=true` URL parameters provide declarative alternatives; see [URL Parameters](/reference/url-parameters) for details.
+
+**No additional fields.**
+
+```javascript
+iframe.contentWindow.postMessage({ type: 'emulator_pause' }, '*');
+```
+
+---
+
+## `emulator_unpause`
+
+Resumes a previously paused emulator. Execution picks up exactly where it left off.
+
+**No additional fields.**
+
+```javascript
+iframe.contentWindow.postMessage({ type: 'emulator_unpause' }, '*');
+```
+
+---
+
+## `emulator_mouse_move`
+
+Sends a mouse movement event to the emulated machine. The emulator backend determines whether absolute or relative coordinates are used.
+
+<ParamField query="x" type="number">
+  Absolute X position in screen pixels. Used by emulators that support absolute
+  mouse coordinates: **Mini vMac**, **Basilisk II**, **SheepShaver**, and
+  **Snow**.
+</ParamField>
+
+<ParamField query="y" type="number">
+  Absolute Y position in screen pixels. Used by the same emulators as `x`.
+</ParamField>
+
+<ParamField query="deltaX" type="number">
+  Relative X delta in pixels. Used by emulators that only support relative mouse
+  input: **Previous**, **DingusPPC**, and **PearPC**.
+</ParamField>
+
+<ParamField query="deltaY" type="number">
+  Relative Y delta in pixels. Used by the same emulators as `deltaX`.
+</ParamField>
+
+<Note>
+  You should always send all four fields in every `emulator_mouse_move` message.
+  The active emulator backend picks the coordinate system it understands and
+  ignores the other pair. For absolute-coordinate emulators (Mini vMac, Basilisk
+  II, SheepShaver, Snow) the `x`/`y` values are used; for relative-coordinate
+  emulators (Previous, DingusPPC, PearPC) the `deltaX`/`deltaY` values are
+  used.
+</Note>
+
+```javascript
+// Move to absolute position (640×480 screen) and provide a relative delta
+iframe.contentWindow.postMessage({
+  type: 'emulator_mouse_move',
+  x: 320,
+  y: 240,
+  deltaX: 4,
+  deltaY: -2,
+}, '*');
+```
+
+---
+
+## `emulator_mouse_down` / `emulator_mouse_up`
+
+Sends a mouse button press or release to the emulated machine.
+
+<ParamField query="button" type="number">
+  The mouse button to press or release.
+
+  | Value | Button |
+  |-------|--------|
+  | `0`   | Left   |
+  | `1`   | Middle |
+  | `2`   | Right  |
+</ParamField>
+
+<Warning>
+  Right-click (`button: 2`) is only supported by the **Previous** emulator and
+  **DingusPPC** when running Mac OS X. On all other emulator/OS combinations the
+  event is silently ignored.
+</Warning>
+
+```javascript
+// Left mouse button press
+iframe.contentWindow.postMessage({ type: 'emulator_mouse_down', button: 0 }, '*');
+
+// Left mouse button release
+iframe.contentWindow.postMessage({ type: 'emulator_mouse_up', button: 0 }, '*');
+
+// Right-click (Previous / DingusPPC + Mac OS X only)
+iframe.contentWindow.postMessage({ type: 'emulator_mouse_down', button: 2 }, '*');
+iframe.contentWindow.postMessage({ type: 'emulator_mouse_up',   button: 2 }, '*');
+```
+
+---
+
+## `emulator_key_down` / `emulator_key_up`
+
+Sends a physical key press or release to the emulated machine. The emulator translates the JavaScript key code into the appropriate ADB or platform-specific scancode.
+
+<ParamField query="code" type="string">
+  A physical key code string matching the [`KeyboardEvent.code`](https://developer.mozilla.org/en-US/docs/Web/API/KeyboardEvent/code)
+  values defined by the W3C UI Events specification. These identify a key by its
+  **physical position** on the keyboard rather than the character it produces,
+  so they are layout-independent. Common examples: `"KeyA"`, `"Space"`,
+  `"Enter"`, `"ArrowLeft"`, `"ShiftLeft"`, `"MetaLeft"`, `"Escape"`.
+
+  The full mapping from JavaScript key codes to ADB and other platform
+  scancodes is in
+  [`src/emulator/common/key-codes.ts`](https://github.com/mihaip/infinite-mac/blob/main/src/emulator/common/key-codes.ts).
+  The full list of valid `code` strings is documented on
+  [MDN](https://developer.mozilla.org/en-US/docs/Web/API/UI_Events/Keyboard_event_code_values).
+</ParamField>
+
+```javascript
+// Type the letter "A"
+iframe.contentWindow.postMessage({ type: 'emulator_key_down', code: 'KeyA' }, '*');
+iframe.contentWindow.postMessage({ type: 'emulator_key_up',   code: 'KeyA' }, '*');
+
+// Press Command+S (Save) — MetaLeft maps to the Mac Command key
+iframe.contentWindow.postMessage({ type: 'emulator_key_down', code: 'MetaLeft' }, '*');
+iframe.contentWindow.postMessage({ type: 'emulator_key_down', code: 'KeyS' }, '*');
+iframe.contentWindow.postMessage({ type: 'emulator_key_up',   code: 'KeyS' }, '*');
+iframe.contentWindow.postMessage({ type: 'emulator_key_up',   code: 'MetaLeft' }, '*');
+```
+
+---
+
+## `emulator_load_disk`
+
+Dynamically inserts a disk image into the running emulator at any point after boot, without requiring a restart.
+
+<ParamField query="url" type="string">
+  The URL of an **uncompressed** disk image to load. Supported file types
+  include `.dsk`, `.img`, `.iso`, and `.toast`. The URL must be accessible from
+  the emulator's origin, so CORS headers are required for cross-origin images.
+</ParamField>
+
+<Note>
+  `emulator_load_disk` is only supported by the **Mini vMac**, **Basilisk II**,
+  **SheepShaver**, and **Previous** emulators. Sending this event to a
+  DingusPPC, PearPC, or Snow-backed instance has no effect.
+</Note>
+
+```javascript
+iframe.contentWindow.postMessage({
+  type: 'emulator_load_disk',
+  url: 'https://example.com/my-app.dsk',
+}, '*');
+```

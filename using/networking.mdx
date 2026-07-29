@@ -1,0 +1,80 @@
+---
+title: "AppleTalk Networking Between Emulator Instances"
+sidebarTitle: "Networking"
+description: "Connect multiple Infinite Mac instances over AppleTalk using named zones, powered by Cloudflare Workers Durable Objects and WebSocket bridging."
+---
+
+Infinite Mac can connect multiple emulator instances over a virtual AppleTalk network, enabling classic features like AppleShare file sharing and AppleTalk-based multiplayer games to work across separate browser tabs or even separate computers. Networking is zone-based: instances that share the same zone name are bridged together, while instances in different zones are fully isolated.
+
+<Note>
+  AppleTalk networking is only supported by **Basilisk II** and **SheepShaver**. Other emulators (Mini vMac, DingusPPC, Previous, PearPC, Snow) do not support AppleTalk.
+</Note>
+
+## How it works
+
+When a zone name is configured, each emulator instance creates a `CloudflareWorkerEthernetProvider`. This provider opens a WebSocket connection to:
+
+```
+wss://<host>/zone/<zone-name>/websocket
+```
+
+A Cloudflare Workers Durable Object running on the server side acts as an Ethernet hub for the zone: it receives raw Ethernet frames from each connected instance and broadcasts them to all others in the same zone. The emulator's AppleTalk stack sees this as a normal LocalTalk-style broadcast network.
+
+Packets are JSON-encoded on the wire. Each provider sends an `init` message with its MAC address when the connection opens, then `send` messages carrying the destination address and packet payload. Incoming frames arrive as `receive` messages and are passed directly to the emulator's networking subsystem.
+
+If the WebSocket connection drops, `CloudflareWorkerEthernetProvider` automatically reconnects after a one-second delay and replays any buffered outgoing messages.
+
+## Joining a named zone
+
+### Via URL parameter
+
+Append `?appleTalk=<zone-name>` to any Basilisk II or SheepShaver session URL:
+
+```
+https://infinitemac.org/1997/Mac%20OS%208?appleTalk=myfriends
+https://infinitemac.org/1991/System%207.0?appleTalk=lan-party-1991
+```
+
+All browser tabs — regardless of which computer they run on — that open the same URL (or any URL with the same `appleTalk` value) will be joined to the same virtual network.
+
+### Via the custom configuration dialog
+
+1. Open the [custom configuration dialog](/using/custom-configuration) by clicking **Customize…** on a disk tile or navigating to `/run`.
+2. Select a system disk and machine that support AppleTalk (any Basilisk II or SheepShaver-backed release).
+3. In the **Advanced** section, check **Enable AppleTalk** and enter a zone name in the text field.
+4. Click **Run**.
+
+The zone name is embedded in the session URL so you can share it with others.
+
+<Warning>
+  Zone names are public and unprotected. Anyone who knows the zone name can join the same virtual network and see all AppleTalk traffic on it. Do not share sensitive files or use predictable zone names in untrusted environments.
+</Warning>
+
+## Practical use cases
+
+<CardGroup cols={2}>
+  <Card title="AppleShare file sharing" icon="folder-open">
+    Run AppleShare or Personal File Sharing on one instance. Other instances on the same zone will see the shared volume in the Chooser and can mount it for read/write access.
+  </Card>
+  <Card title="Multiplayer games" icon="gamepad">
+    Many classic Mac games (Marathon, Bolo, Spectre, and others) support AppleTalk network play. Join the same zone and open a network game from within the game itself.
+  </Card>
+  <Card title="AppleTalk printing" icon="print">
+    Services that expose a printer via AppleTalk will appear in the Chooser on all connected instances, enabling cross-instance printing (to virtual printers or real networked ones if bridged).
+  </Card>
+  <Card title="LocalTalk messaging" icon="message">
+    Applications like Talk and NetPresenz that use AppleTalk for messaging will discover peers automatically within the same zone.
+  </Card>
+</CardGroup>
+
+## BroadcastChannel provider (local/dev)
+
+For local testing within the same browser page, Infinite Mac includes a `BroadcastChannelEthernetProvider`. Instead of a WebSocket, it uses the browser's `BroadcastChannel` API on a channel named `"ethernet"`. All emulator instances in the same browser origin that share this channel can exchange Ethernet frames without any server involvement.
+
+This provider is activated via the `broadcast_channel_ethernet=true` URL parameter and is intended for development and testing, not production use.
+
+```
+https://infinitemac.org/1997/Mac%20OS%208?broadcast_channel_ethernet=true
+```
+
+Unlike named zones, the BroadcastChannel is limited to tabs within the same browser and cannot connect to other users.

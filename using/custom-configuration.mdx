@@ -1,0 +1,165 @@
+---
+title: "Build and Run Custom Mac Configurations"
+sidebarTitle: "Custom Config"
+description: "Combine any system disk, machine model, RAM size, screen resolution, and external disk images to create a custom Infinite Mac session."
+---
+
+Infinite Mac's custom configuration dialog lets you assemble a bespoke emulator session from scratch. You can pick any combination of system disk, emulated machine, RAM size, screen resolution, and additional disk or CD-ROM images — then launch it, share it as a URL, or embed it on your own site. Every option you set is reflected in the URL in real time, so the resulting link fully describes the session.
+
+## Opening the dialog
+
+<Tabs>
+  <Tab title="From the browser">
+    Click the **Run…** button on the **Custom** tile at the bottom of the disk grid (under the current year heading). Alternatively, click the **Customize…** button on any standard disk tile to pre-populate the dialog with that release's defaults.
+  </Tab>
+  <Tab title="Via URL">
+    Navigate directly to `/run` on any Infinite Mac host:
+
+    ```
+    https://infinitemac.org/run
+    ```
+
+    Query parameters in the URL are parsed and applied to the dialog state, so you can construct a fully-configured link and share it without the recipient needing to touch any controls.
+  </Tab>
+</Tabs>
+
+## Configuration fields
+
+### Machine
+
+Choose the emulated hardware model from a grouped dropdown. Machines are organised into four groups:
+
+| Group | Emulator |
+|---|---|
+| 68K | BasiliskII |
+| 68K (Experimental) | Snow |
+| PowerPC | SheepShaver, DingusPPC, PearPC |
+| NeXT | Previous |
+
+The emulator type in use is shown below the dropdown as a hint. Changing the machine may reset the RAM size if the current selection is not available on the new model.
+
+**URL parameter:** `machine=<name>` (e.g. `machine=Quadra+650`)
+
+### System disk
+
+Select the boot disk from a dropdown that groups options by platform:
+
+- Mac (System Software through Mac OS 9)
+- Mac OS X
+- NeXT
+- A/UX
+- Floppy Disks
+
+You can also attach a local disk image file by selecting **Disk File…** from the bottom of the dropdown. Supported formats are `.img`, `.iso`, `.dsk`, `.hda`, `.toast`, `.cdr`, and `.bin`. Multiple disks can be added with the **+** button; use **–** to remove one.
+
+**URL parameter:** `disk=<display-name>` (e.g. `disk=System+7.5.5`). Repeat the parameter for multiple disks.
+
+### RAM size
+
+Each machine offers a fixed set of supported RAM sizes; the first value in the list is the default. Selecting a smaller amount may prevent some operating system versions from booting.
+
+**URL parameter:** `ram=<size>` (e.g. `ram=8M`)
+
+<Note>
+  Not all RAM/OS combinations work. For example, System 7.5 requires at least 4 MB of RAM on most machines.
+</Note>
+
+### Screen size
+
+<Tabs>
+  <Tab title="Preset options">
+    | Value | Behaviour |
+    |---|---|
+    | `auto` | Fills the available browser viewport (default) |
+    | `window` | Opens in a floating window at the machine's native size |
+    | `fullscreen` | Requests the browser's full-screen API |
+  </Tab>
+  <Tab title="Custom dimensions">
+    Select **Custom** from the dropdown and enter a pixel width and height. The values are written to the URL as `<width>x<height>`:
+
+    ```
+    ?screenSize=800x600
+    ?screenSize=1024x768
+    ```
+
+    Not all machines support arbitrary screen sizes; some combinations may result in a crash or garbled display.
+  </Tab>
+</Tabs>
+
+**URL parameter:** `screenSize=auto|window|fullscreen|<W>x<H>`
+
+### Built-in disks
+
+<CardGroup cols={2}>
+  <Card title="Infinite HD" icon="hard-drive">
+    A large pre-populated hard disk containing representative software for the selected era. Enabled by default. Not available on all machines (e.g. MFS-only early Macs do not support it).
+  </Card>
+  <Card title="Saved HD" icon="floppy-disk">
+    An empty 1 GB disk whose contents persist across browser sessions using the browser's storage APIs. Enabled by default when the browser supports it. Not available on all machines.
+  </Card>
+</CardGroup>
+
+**URL parameters:** `infinite_hd=true|false`, `saved_hd=true|false`
+
+### Disk URL
+
+Mount a raw disk or CD-ROM image directly from a URL without downloading it first. The image is streamed in chunks on demand, so large images (such as full CD-ROMs) load quickly.
+
+Requirements:
+- The file must be a raw `.iso`, `.img`, `.toast`, or `.bin` (not compressed or wrapped).
+- The hosting server must support HTTP range requests.
+- The domain must be on the allow-list: `archive.org`, `aresluna.org`, `edtecharchive.com`, `flanigan.us`, `fsck.technology`, `gildev.dev`, `img.classicmacdemos.com`, `macintoshgarden.org`, `mac.gdn`, `macintoshrepository.org`, `resources.cafe-megabyte.de`, `gardenmirror.oldapplestuff.com`.
+
+Each URL entry has a **CD-ROM (read-only)** checkbox. Uncheck it to mount the image as a read-write hard disk instead.
+
+**URL parameters:** `disk_url=<url>` for read-write disks, `cdrom=<url>` or `cdrom_url=<url>` for read-only CD-ROMs.
+
+### Advanced options
+
+#### Custom date
+
+Override the system clock to a specific date. This is useful for running time-limited or copy-protected software that has expired.
+
+**URL parameter:** `date=YYYY-MM-DD`
+
+#### AppleTalk zone
+
+Enable AppleTalk networking and assign this instance to a named zone. All browser tabs that share the same zone name can communicate over a virtual AppleTalk network. This field only appears when both the selected system disk and the emulator type support AppleTalk (Basilisk II and SheepShaver only).
+
+**URL parameter:** `appleTalk=<zone-name>`
+
+#### BlueSCSI Toolbox
+
+Enables experimental BlueSCSI Toolbox protocol support on DingusPPC, which allows files to be transferred between the emulated Mac and the host browser via a virtual SCSI device.
+
+**URL parameter:** `blue_scsi=true`
+
+#### Debug mode
+
+Enables extra console logging and a verbose boot sequence where supported (DingusPPC, Previous, PearPC).
+
+**URL parameter:** `debug_log=true`
+
+## Example URLs
+
+A fully specified custom session with a Quadra 650, System 7.5.5, 8 MB RAM, and an 800×600 screen:
+
+```
+https://infinitemac.org/run?machine=Quadra+650&disk=System+7.5.5&ram=8M&screenSize=800x600
+```
+
+Running System 7.1 on a Mac IIx with a CD-ROM image from archive.org:
+
+```
+https://infinitemac.org/run?machine=Mac+IIx&disk=System+7.1&cdrom=https%3A%2F%2Farchive.org%2Fdownload%2Fexample%2Fdisk.iso
+```
+
+A SheepShaver session with AppleTalk enabled for zone `friends`:
+
+```
+https://infinitemac.org/1999/Mac%20OS%209.0?appleTalk=friends
+```
+
+<Tip>
+  After configuring a session in the dialog, you can copy the resulting URL from the browser's address bar and share it. Anyone opening the link will see exactly the same configuration.
+</Tip>

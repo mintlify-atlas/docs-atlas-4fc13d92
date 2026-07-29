@@ -1,0 +1,105 @@
+{
+  "projectType": "saas",
+  "projectName": "Infinite Mac",
+  "projectDescription": "A browser-based emulator that runs classic Macintosh (and NeXT) operating systems from the 1980s through the early 2000s, powered by WebAssembly emulator cores and served via Cloudflare Workers.",
+  "theme": "almond",
+  "primaryColor": "#b40a42",
+  "lightColor": "#0a1814",
+  "darkColor": "#a7a296",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "quickstart",
+              "architecture"
+            ]
+          },
+          {
+            "group": "Using Infinite Mac",
+            "pages": [
+              "using/browser",
+              "using/custom-configuration",
+              "using/file-transfer",
+              "using/networking",
+              "using/settings"
+            ]
+          },
+          {
+            "group": "Embedding",
+            "pages": [
+              "embedding/overview",
+              "embedding/iframe-parameters",
+              "embedding/postmessage-api"
+            ]
+          },
+          {
+            "group": "Development",
+            "pages": [
+              "development/setup",
+              "development/commands",
+              "development/emulators",
+              "development/deployment"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Reference",
+        "groups": [
+          {
+            "group": "Machines & Disks",
+            "pages": [
+              "reference/machines",
+              "reference/disks",
+              "reference/emulator-types"
+            ]
+          },
+          {
+            "group": "Embed API",
+            "pages": [
+              "reference/embed-control-events",
+              "reference/embed-notification-events",
+              "reference/url-parameters"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Instant in-browser emulation of classic Mac OS (System 1 through Mac OS X 10.4) and NeXTSTEP",
+    "Multiple emulator cores: Basilisk II, SheepShaver, Mini vMac, DingusPPC, Previous, PearPC, Snow",
+    "Large pre-built software library (Infinite HD) and Macintosh Garden integration",
+    "CD-ROM library with browseable and mountable disc images",
+    "AppleTalk networking between emulator instances via Cloudflare Workers",
+    "Embeddable via iframe with a full postMessage control API",
+    "Custom configurations: choose machine, RAM size, screen resolution, and disk images",
+    "Saved HD for persistent storage across sessions",
+    "File drag-and-drop with resource fork support",
+    "Infinite Monkey LLM-based computer-use demonstration",
+    "Deployed on Cloudflare Workers with R2 storage for disk images"
+  ],
+  "publicApiSurface": [
+    "EmbedControlEvent (emulator_pause, emulator_unpause, emulator_mouse_move, emulator_mouse_down, emulator_mouse_up, emulator_key_down, emulator_key_up, emulator_load_disk)",
+    "EmbedNotificationEvent (emulator_loaded, emulator_screen)",
+    "runDefFromUrl(urlString: string): RunDef | undefined",
+    "runDefToUrl(runDef: RunDef, toEmbed?: boolean): string",
+    "RunDef type (machine, ramSize, screenSize, disks, diskFiles, cdromURLs, ethernetProvider, flags, settings, ...)",
+    "ScreenSize type (auto | fullscreen | window | embed | {width, height})",
+    "EmulatorSettings (swapControlAndCommand, speed, useMouseDeltas, trackpadMode, screenScaling)",
+    "URL query parameters: disk, machine, ram, screenSize, screen_scale, cdrom, cdrom_url, infinite_hd, saved_hd, library, appleTalk, paused, auto_pause, screen_update_messages, blue_scsi, settings, date",
+    "npm run start — local dev server",
+    "npm run import-disks — build disk images",
+    "npm run import-cd-roms — build CD-ROM library",
+    "npm run import-library — build software library",
+    "npm run import-emulator <name> — copy WASM emulator binary",
+    "npm run build — production build",
+    "npm run worker-deploy — deploy to Cloudflare Workers",
+    "npm run sync-disks — sync disk images to R2"
+  ]
+}

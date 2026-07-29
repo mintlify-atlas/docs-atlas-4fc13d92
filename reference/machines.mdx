@@ -1,0 +1,216 @@
+---
+title: "Supported Mac and NeXT Machine Models"
+sidebarTitle: "Machines"
+description: "All machine definitions supported by Infinite Mac: CPU, emulator type, RAM options, screen sizes, and platform for every model from Mac 128K to Power Mac G4."
+---
+
+Infinite Mac supports a wide range of classic Macintosh and NeXT hardware models, each defined by a `MachineDef` object in the source. Every machine definition specifies which emulator core to use, what CPU is being emulated, which ROM image to load, available RAM configurations, and how the on-screen bezel should look. Some machines exist in multiple variants — for example, several 68K models are available under both the original Mini vMac emulator and the newer Snow emulator.
+
+## The `MachineDef` Type
+
+Each machine is described by the `MachineDef` type, which extends `EmulatorDef`:
+
+```typescript
+export type MachineDef = EmulatorDef & {
+    name: string;
+    cpu: EmulatorCpu;
+    speedGovernorTargetIPS?: number;
+    romPath: string;
+    gestaltID: number;
+    modifier?: "FDHD";
+    prefsPath: string;
+    fixedScreenSize?: {width: number; height: number};
+    supportedScreenSizes?: {
+        width: number;
+        height: number;
+        monitorId?: string;
+    }[];
+    mfsOnly?: boolean;
+    bezelStyle: "Beige" | "Platinum" | "Pinstripes" | "NeXT";
+    ramSizes: MachineDefRAMSize[]; // First value is the default
+    platform?: MachinePlatform;
+    extraFiles?: {[fileName: string]: string};
+    verboseBootEnvVars?: {[name: string]: string};
+    hasSCSI?: boolean;
+    isHidden?: boolean;
+};
+
+export type MachineDefRAMSize = `${number}M` | `${number}K`;
+```
+
+### Key Fields Explained
+
+**`ramSizes`** — An array of available RAM configurations (e.g. `["4M", "128M", "64M"]`). The first entry is the default selection shown in the UI.
+
+**`fixedScreenSize`** — When set, the machine uses exactly this one screen resolution and no other. Early compact Macs all use `{width: 512, height: 342}`.
+
+**`supportedScreenSizes`** — An array of selectable resolutions for machines with video cards. Each entry may include a `monitorId` string used by DingusPPC to identify the monitor type. When neither field is set, the emulator uses the `DEFAULT_SUPPORTED_SCREEN_SIZES` list (`1600×1200`, `1280×1024`, `1152×870`, `1024×768`, `800×600`, `640×480`).
+
+**`mfsOnly`** — When `true`, the machine only supports the Macintosh File System (MFS) used by the original 128K and 512K Macs. HFS disks and the Infinite HD library are unavailable.
+
+**`hasSCSI`** — When `true` on a Snow-emulated machine, enables the Infinite HD and Saved HD disk volumes.
+
+**`speedGovernorTargetIPS`** — If specified, the emulator uses a software speed governor to target this instructions-per-second rate, approximating the original hardware speed (used for the Mac IIfx and Quadra 650).
+
+**`gestaltID`** — The Macintosh Gestalt machine ID used by the OS to identify the hardware model.
+
+**`modifier`** — Currently only `"FDHD"`, indicates a machine variant with a high-density floppy drive.
+
+## The `MachinePlatform` Type
+
+```typescript
+export type MachinePlatform = "Macintosh" | "NeXT";
+```
+
+Most machines have no explicit `platform` field and default to the Macintosh platform. NeXT machines explicitly set `platform: "NeXT"`, which affects which disk images are shown in the browser.
+
+## Bezel Styles
+
+The `bezelStyle` field controls the decorative frame drawn around the emulated screen:
+
+| Value | Era | Examples |
+|---|---|---|
+| `"Beige"` | 1984–1987 compact Macs | Mac 128K, Mac Plus |
+| `"Platinum"` | 1987–1998 modular Macs | Mac SE, Mac II, Quadra 650 |
+| `"Pinstripes"` | 1998+ iMac-era Macs | iMac G3, Power Mac G3 Blue & White |
+| `"NeXT"` | NeXT hardware | NeXT Computer, NeXTstation |
+
+---
+
+## 68K Macintosh — Mini vMac
+
+These machines use the [Mini vMac](https://www.gryphel.com/c/minivmac/) emulator. Mini vMac requires subtypes (`EmulatorMinivMacSubtypes`) to select the specific hardware variant.
+
+| Name | CPU | Emulator Subtype | RAM Sizes | Screen |
+|---|---|---|---|---|
+| Mac 128K | 68000 | `128K` | 128K | 512×342 (fixed) |
+| Mac 512Ke | 68000 | `512Ke` | 512K | 512×342 (fixed) |
+| Mac Plus | 68000 | `Plus` | 4M | 512×342 (fixed) |
+| Mac SE | 68000 | `SE` | 4M | 512×342 (fixed) |
+| Mac II | 68020 | `II` | 8M | 640×480 (fixed) |
+| Mac IIx | 68030 | `IIx` | 32M | 640×480 (fixed) |
+
+<Note>
+The Mac 128K under Mini vMac sets `mfsOnly: true` — it can only load MFS-format floppy images and cannot use the Infinite HD library. The Infinite HD disk is delay-mounted after boot to work around a compatibility issue.
+</Note>
+
+## 68K Macintosh — Snow
+
+Snow is a newer Rust-based 68K emulator (see [Emulator Types](/reference/emulator-types)). The Snow variants of early Macs often support more RAM options and have SCSI support enabling the Infinite HD library.
+
+| Name | CPU | RAM Sizes | Screen | hasSCSI |
+|---|---|---|---|---|
+| Mac 128K (Snow) | 68000 | 128K | 512×342 (fixed) | — |
+| Mac 512K (Snow) | 68000 | 512K | 512×342 (fixed) | — |
+| Mac 512Ke (Snow) | 68000 | 512K, 128K | 512×342 (fixed) | — |
+| Mac Plus (Snow) | 68000 | 4M, 2M, 1M | 512×342 (fixed) | ✓ |
+| Mac SE (Snow) | 68000 | 4M, 2M, 1M | 512×342 (fixed) | ✓ |
+| Mac SE FDHD (Snow) | 68000 | 4M, 2M, 1M | 512×342 (fixed) | ✓ |
+| Mac Classic (Snow) | 68000 | 4M, 2M, 1M | 512×342 (fixed) | ✓ |
+| Mac II (Snow) | 68020 | 8M, 4M, 2M, 1M | 1152×870, 640×870, 640×480, 512×384 | ✓ |
+| Mac II FDHD (Snow) | 68020 | 8M, 128M, 32M, 16M, 4M, 2M, 1M | 1152×870, 640×870, 640×480, 512×384 | ✓ |
+| Mac IIx (Snow) | 68030 | 8M, 128M, 32M, 16M, 4M, 2M, 1M | 1152×870, 640×870, 640×480, 512×384 | ✓ |
+| Mac IIcx (Snow) | 68030 | 8M, 128M, 32M, 16M, 4M, 2M, 1M | 1152×870, 640×870, 640×480, 512×384 | ✓ |
+| Mac SE/30 (Snow) | 68030 | 8M, 128M, 32M, 16M, 4M, 2M, 1M | 512×342 (fixed) | ✓ |
+
+The Mac II family (Snow) includes extra ROM files in their Emscripten filesystem — a `mac-ii-display-card-8-24.rom` for Mac II/IIx/IIcx variants and a `se30-video.rom` for the SE/30.
+
+## 68K Macintosh — Basilisk II
+
+The [Basilisk II](https://basilisk.cebix.net/) emulator handles the Mac IIfx and Quadra 650. Both use a `speedGovernorTargetIPS` to throttle emulation speed for realistic benchmark results.
+
+| Name | CPU | Gestalt ID | RAM Sizes | Screen | Target IPS |
+|---|---|---|---|---|---|
+| Mac IIfx | 68030 | 13 | 128M, 64M, 32M, 16M, 8M, 4M | Default sizes | 4,000,000 |
+| Quadra 650 | 68040 | 36 | 128M, 64M, 32M, 16M, 8M, 4M | Default sizes | 8,000,000 |
+
+## PowerPC Macintosh — DingusPPC
+
+[DingusPPC](https://github.com/dingusdev/dingusppc) emulates early PowerPC Macs with OldWorld ROM (NuBus and PCI). These machines support multiple selectable screen resolutions via `supportedScreenSizes` with named `monitorId` values.
+
+| Name | CPU | Gestalt ID | RAM Sizes | Screen Options |
+|---|---|---|---|---|
+| Power Macintosh 6100 | 601 | 67 | 136M, 72M, 40M, 24M, 12M, 8M | 832×624, 640×870, 640×480 |
+| Power Macintosh 7200 | 601 | 108 | 16M, 32M, 64M, 128M, 256M | 1152×870, 832×624, 640×870, 640×480 |
+| Power Macintosh 7500 | 601 | 68 | 16M, 32M, 64M, 128M, 256M | 1152×870, 832×624, 640×870, 640×480 |
+| Power Macintosh G3 (Beige) | G3 | 510 | 256M, 128M, 64M, 32M | 1152×870, 1024×768, 832×624, 640×480 |
+| iMac G3 (233 MHz) | G3 | 406 | 128M, 64M, 32M, 256M, 512M, 1024M | 1152×870, 1024×768, 832×624, 640×480 |
+
+The Power Macintosh G3 (Beige) and iMac G3 include `verboseBootEnvVars` for enabling verbose boot output when debug logs are requested.
+
+## PowerPC Macintosh — SheepShaver
+
+[SheepShaver](https://sheepshaver.cebix.net/) emulates PowerPC Macs using NewWorld ROM (G3 Blue & White era and later). These machines use `sheepShaverPrefsPath` and support AppleTalk networking.
+
+| Name | CPU | Gestalt ID | RAM Sizes | Bezel |
+|---|---|---|---|---|
+| Power Macintosh 9500 | 604 | 67 | 256M, 128M, 64M, 32M, 16M | Platinum |
+| Power Macintosh G3 (Blue & White) | G3 | 406 | 256M, 128M, 64M | Pinstripes |
+
+## Mac OS X — PearPC
+
+[PearPC](https://pearpc.sourceforge.net/) emulates a G4-class machine capable of running early Mac OS X releases. The CPU field is `"G3"` (the closest available type), but the machine is named as a G4.
+
+| Name | CPU | Gestalt ID | RAM Sizes | Bezel |
+|---|---|---|---|---|
+| Power Macintosh G4 (PCI Graphics) | G3 | 406 | 256M, 128M, 64M, 32M | Pinstripes |
+
+## NeXT Platform — Previous
+
+[Previous](http://previous.alternative.de/) emulates the NeXT hardware family. All NeXT machines set `platform: "NeXT"` and use `bezelStyle: "NeXT"` with a fixed screen size of `1120×832`.
+
+| Name | CPU | Subtype | Gestalt ID | RAM Sizes |
+|---|---|---|---|---|
+| NeXT Computer | 68030 | `NeXT Computer` | 0 (NEXT\_CUBE030) | 64M, 32M, 16M |
+| NeXTcube | 68040 | `NeXTcube` | 1 (NEXT\_CUBE040) | 64M, 32M, 16M |
+| NeXTstation | 68040 | `NeXTstation` | 2 (NEXT\_STATION) | 32M, 16M |
+| NeXTstation Turbo Color | 68040 | `NeXTstation Turbo Color` | 2 (NEXT\_STATION) | 128M, 64M, 32M, 16M |
+
+## Hidden Machines
+
+<Note>
+The Power Macintosh G3 (Blue & White) - Experimental machine (`POWER_MACINTOSH_G3_BW_DPPC`) sets `isHidden: true`. It is available via a direct URL but does not appear in the main machine browser. The source comment notes it is "not materially interesting (vs the other DingusPPC machines)" since the SheepShaver-based G3 Blue & White covers the same OS range more reliably.
+</Note>
+
+## The `ALL_MACHINES` Array
+
+The complete ordered list exported from `machines.ts`:
+
+```typescript
+export const ALL_MACHINES = [
+    MAC_128K, MAC_128K_SNOW, MAC_512K_SNOW, MAC_512KE, MAC_512KE_SNOW,
+    MAC_PLUS, MAC_PLUS_SNOW, MAC_SE, MAC_SE_SNOW, MAC_SE_FDHD_SNOW,
+    MAC_CLASSIC_SNOW, MAC_II, MAC_II_SNOW, MAC_II_FDHD_SNOW,
+    MAC_IIx, MAC_IIx_SNOW, MAC_IIcx_SNOW, MAC_SE30_SNOW,
+    MAC_IIFX, QUADRA_650,
+    POWER_MACINTOSH_6100, POWER_MACINTOSH_7200, POWER_MACINTOSH_7500,
+    POWER_MACINTOSH_9500, POWER_MACINTOSH_G3_BEIGE, IMAC_G3,
+    POWER_MACINTOSH_G3_BW_DPPC, POWER_MACINTOSH_G3_BW,
+    POWER_MACINTOSH_G4_PEARPC,
+    NEXT_COMPUTER, NEXT_CUBE, NEXT_STATION, NEXT_STATION_TURBO_COLOR,
+];
+```
+
+Machines are looked up by name via `MACHINES_BY_NAME`, which is built from this array.
+
+## Infinite HD and Saved HD Availability
+
+Two helper functions gate access to the shared disk libraries:
+
+```typescript
+export function machineSupportsInfiniteHD(machine: MachineDef): boolean {
+    if (machine.emulatorType === "Snow") {
+        return machine.hasSCSI === true;
+    }
+    return true;
+}
+
+export function machineSupportsSavedHD(machine: MachineDef): boolean {
+    if (machine.emulatorType === "Snow") {
+        return machine.hasSCSI === true;
+    }
+    return !machine.mfsOnly;
+}
+```
+
+Snow machines require `hasSCSI: true` for either library. Non-Snow machines always support the Infinite HD, but cannot use the Saved HD if `mfsOnly` is set (i.e. the Mac 128K).

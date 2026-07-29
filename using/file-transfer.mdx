@@ -1,0 +1,100 @@
+---
+title: "Transferring Files Into and Out of Infinite Mac"
+sidebarTitle: "File Transfer"
+description: "Drag files into the Infinite Mac window to upload them, download files from the emulator as ZIP archives, and preserve HFS resource forks."
+---
+
+Infinite Mac supports two-way file transfer between the host browser and the emulated Mac. You can drag files from your desktop into the emulator window to copy them onto the Mac, and files saved to a special Downloads folder inside the Mac are made available for download on the host. Both directions respect classic Mac resource forks, using ZIP archives and AppleDouble metadata to carry the fork data across the browser boundary.
+
+<Note>
+  File drag-and-drop and the Downloads folder are only available on emulators that support them: **Basilisk II**, **SheepShaver**, and **DingusPPC** with BlueSCSI Toolbox enabled (the last of these presents files via "The Outside World" disk). Mini vMac, Previous, and PearPC do not support file transfer.
+</Note>
+
+## Dragging files into the emulator
+
+<Steps>
+  <Step title="Start the emulator">
+    Launch any Basilisk II or SheepShaver-backed release (System 7 through Mac OS 9, most PowerPC releases). You will see an overlay appear when you drag files over the emulator window indicating where they will land.
+  </Step>
+  <Step title="Drag files over the window">
+    Drag one or more files from your desktop onto the emulator canvas. An overlay appears confirming the target location.
+  </Step>
+  <Step title="Files appear in the Downloads folder">
+    Regular files (documents, applications, scripts) are placed in the **Downloads** folder on "The Outside World" disk. Disk images (`.img`, `.iso`, `.dsk`, `.hda`, `.toast`, `.cdr`, `.bin`) are automatically mounted as additional drives.
+  </Step>
+</Steps>
+
+You can also click the **Load File** button in the emulator chrome (next to the Home button) to open a file picker instead of dragging.
+
+### Dragging directories
+
+Dragging a folder onto the emulator window uploads the entire directory tree, preserving the folder hierarchy. On macOS, the browser can also read the `..namedfork/rsrc` extended attribute alongside each file and upload the resource fork automatically.
+
+## Resource forks and ZIP archives
+
+Classic Mac files often carry a resource fork alongside the data fork — this is where applications store code, icons, menus, and other structured resources. Standard file systems on Windows and Linux do not preserve resource forks, so Infinite Mac uses a ZIP-based workflow to carry them across.
+
+<Tabs>
+  <Tab title="Uploading files with resource forks">
+    If you are transferring files that originated on a real Mac and need their resource forks intact, **zip the files first** before dragging them into the emulator window. Infinite Mac will:
+
+    1. Unpack the ZIP archive inside the emulator.
+    2. Detect AppleDouble metadata files (`.AppleDouble` or `__MACOSX` wrappers) inside the archive.
+    3. Reconstitute the resource fork alongside each data file on the HFS volume.
+
+    If you drag a file that likely has resource forks but is not wrapped in a ZIP, the emulator shows a notification with a link to [a blog post explaining the workflow](https://blog.persistent.info/2025/09/infinite-mac-resource-forks.html).
+  </Tab>
+  <Tab title="Downloading files with resource forks">
+    Files saved to the Downloads folder by the emulated Mac are exposed for download on the host. When a file has a resource fork, Infinite Mac packages both forks into a ZIP archive using AppleDouble format so the fork data is not lost when the file is stored on a resource-fork-unaware file system.
+
+    To reconstitute the file on another Mac (physical or emulated), drag the downloaded ZIP back into an Infinite Mac window — the ZIP will be unpacked and the resource fork will be restored on the HFS volume.
+  </Tab>
+</Tabs>
+
+## The Saved HD disk
+
+Every session that runs on a supported machine includes an optional **Saved HD** disk — a persistent 1 GB HFS volume stored in your browser's IndexedDB. Its contents survive page reloads, new tabs, and browser restarts on the same machine.
+
+### Exporting and importing Saved HD
+
+You can back up, restore, or migrate the Saved HD from the **Settings** dialog.
+
+<Steps>
+  <Step title="Open Settings">
+    Click the **Settings** button (gear icon) in the emulator chrome.
+  </Step>
+  <Step title="Locate the Saved HD section">
+    Scroll to the **Saved HD** heading in the Settings dialog.
+  </Step>
+  <Step title="Export">
+    Click **Export…** and confirm. The Mac will shut down, and the disk image will be generated and downloaded as an `.infinitemacdisk` file. This may take a moment for large disks.
+  </Step>
+  <Step title="Import">
+    Click **Import…** and select a previously exported `.infinitemacdisk` file. The existing Saved HD contents will be overwritten and the Mac will restart.
+  </Step>
+  <Step title="Save as a disk image">
+    Click **Save Disk Image…** to download the Saved HD as a standard `.dsk` file (or `.hda` device image) compatible with other classic Mac emulators such as BasiliskII for desktop or Mini vMac.
+  </Step>
+</Steps>
+
+### Persistence status
+
+The Settings dialog also shows the storage **Persistence** status:
+
+| Status | Meaning |
+|---|---|
+| Persistent | The browser has granted persistence; data will not be evicted under storage pressure. |
+| Transient | Storage may be evicted if the browser runs low on disk space. |
+| Unknown | The persistence API has not returned a result yet. |
+
+Click **Request Persistence** to ask the browser to promote transient storage to persistent. Whether the request is granted depends on the browser and the site's level of user engagement.
+
+## The Macintosh Garden integration
+
+The **Macintosh Garden** library drawer (available in the emulator sidebar) lets you download software directly from [macintoshgarden.org](https://macintoshgarden.org/) into the running emulator without any manual file handling. Files are fetched through a proxy, progress is displayed inline, and the result is placed into the Downloads folder automatically.
+
+For Snow-based emulators that use BlueSCSI, files from the library are transferred via the BlueSCSI SD Transfer mechanism on "The Outside World" disk rather than the Downloads folder.
+
+<Tip>
+  If you need to pre-populate a disk image with content before deploying it, the `import-library` script (run via `npm run import-library`) builds the library metadata index from macintoshgarden.org. See the project README for details.
+</Tip>

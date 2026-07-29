@@ -1,0 +1,291 @@
+---
+title: "URL Query Parameters for Infinite Mac"
+sidebarTitle: "URL Parameters"
+description: "Complete reference for all query parameters accepted by infinitemac.org URLs: machine selection, disks, screen, storage, networking, and debug options."
+---
+
+All configuration of an Infinite Mac session is URL-driven. The `runDefFromUrl` function in [`src/defs/run-def.ts`](https://github.com/mihaip/infinite-mac/blob/main/src/defs/run-def.ts) parses every supported parameter from the URL and assembles a `RunDef` object that drives the emulator. The inverse, `runDefToUrl`, serialises a `RunDef` back to a URL — both functions are the authoritative source of truth for the parameter names and their accepted values documented on this page.
+
+## URL patterns
+
+Infinite Mac recognises two URL shapes.
+
+**Year-path URLs** select a pre-bundled system disk by year and name:
+
+```
+https://infinitemac.org/<year>/<disk-name>
+```
+
+For example: `https://infinitemac.org/1991/System%207.0`
+
+With year-path URLs, `infinite_hd` and `saved_hd` both **default to `true`**; pass `false` explicitly to disable them.
+
+**Custom-run and embed URLs** allow full configuration via query parameters:
+
+```
+https://infinitemac.org/run?...
+https://infinitemac.org/embed?...
+```
+
+The `/embed` variant activates embed-specific behaviour (screen fills the iframe, library drawer is hidden, default `EmulatorSettings` are applied). Every parameter below works with either path unless noted otherwise.
+
+---
+
+## Disk Selection
+
+<ParamField query="disk" type="string">
+  The `displayName` of a built-in system disk to include (e.g. `"System 7.5"`,
+  `"Mac OS 9.0.4"`). May be repeated to include multiple disks. The first disk
+  determines the preferred machine if `machine` is not also specified.
+</ParamField>
+
+<ParamField query="disk_url" type="string">
+  URL of an external disk image to mount. May be repeated for multiple external
+  disks. The image must be reachable from the emulator's origin, so CORS
+  headers are required for cross-origin URLs.
+</ParamField>
+
+<ParamField query="disk_prefetch" type="string">
+  Comma-separated list of chunk indices to prefetch for the corresponding
+  external disk, e.g. `"0,1,2"`. Position-matched with `disk_url` — the first
+  `disk_prefetch` applies to the first `disk_url`, the second to the second,
+  and so on. May be repeated.
+</ParamField>
+
+---
+
+## Machine
+
+<ParamField query="machine" type="string">
+  The exact `name` of a `MachineDef` to use, overriding the disk's preferred
+  machine. Examples: `"Quadra 650"`, `"Power Macintosh G3 (Beige)"`,
+  `"Mac Plus"`. Setting this parameter also marks the run as custom.
+</ParamField>
+
+<ParamField query="ram" type="string">
+  RAM size override for the selected machine. The value must be one of the sizes
+  listed in that machine's `ramSizes` array. Examples: `"128K"`, `"8M"`,
+  `"32M"`, `"256M"`. If the value is not present in the machine's supported
+  sizes it is silently ignored.
+</ParamField>
+
+---
+
+## Screen
+
+<ParamField query="screenSize" type="string">
+  Controls how the emulated screen is sized. Accepted values:
+
+  | Value          | Behaviour                                                                 |
+  |----------------|---------------------------------------------------------------------------|
+  | `auto`         | Default for `/run` URLs. The screen adapts to the window.                 |
+  | `window`       | Screen fills a floating window within the page.                           |
+  | `fullscreen`   | Screen expands to fill the browser viewport.                              |
+  | `embed`        | Set automatically for `/embed` URLs; fills the iframe dimensions.         |
+  | `WxH`          | Fixed resolution, e.g. `"800x600"` or `"1024x768"`.                      |
+
+  When embedding, the iframe's own `width` and `height` attributes determine
+  the emulated screen resolution unless you specify an explicit `WxH` value.
+</ParamField>
+
+<ParamField query="screen_scale" type="number">
+  Pixel scale factor applied to the emulated display, e.g. `2` for 2× integer
+  scaling. At scale `2` you should also double the iframe's `width` and
+  `height` so that the logical resolution remains unchanged while the rendered
+  output is crisper. Also accepted as `screenScale` (camelCase).
+</ParamField>
+
+---
+
+## Storage
+
+<ParamField query="infinite_hd" type="boolean">
+  Whether to mount the **Infinite HD** virtual hard disk, which contains
+  thousands of classic Mac applications drawn from the Macintosh Garden archive.
+  Defaults to `true` for year-path URLs and `false` for `/run`/`/embed` URLs.
+  Pass `"true"` or `"false"` explicitly to override.
+</ParamField>
+
+<ParamField query="saved_hd" type="boolean">
+  Whether to mount the **Saved HD** persistent disk whose contents survive
+  across sessions in the browser's local storage. Defaults to `true` for
+  year-path URLs and `false` for `/run`/`/embed` URLs.
+</ParamField>
+
+<ParamField query="library" type="boolean">
+  Whether to show the Macintosh Garden library drawer that lets users browse and
+  load software at runtime. Defaults to `true`; pass `"false"` to hide it. The
+  drawer is always hidden in embed mode (`/embed` URLs).
+</ParamField>
+
+<ParamField query="library_url" type="string">
+  URL of a Macintosh Garden library item to pre-download when the session
+  starts. The item will be available in the library drawer immediately without
+  requiring the user to initiate a download. May be repeated.
+</ParamField>
+
+---
+
+## CD-ROMs
+
+<ParamField query="cdrom" type="string">
+  URL of a CD-ROM disk image to mount. Also accepted as `cdrom_url`. May be
+  repeated to mount multiple CD-ROMs.
+</ParamField>
+
+<ParamField query="cdrom_url" type="string">
+  Alias for `cdrom`. Both parameter names are collected and merged into a single
+  list of CD-ROM URLs.
+</ParamField>
+
+<ParamField query="cdrom_prefetch" type="string">
+  Comma-separated list of chunk indices to prefetch for the corresponding
+  CD-ROM image, e.g. `"0,1,2,3"`. Position-matched with the merged list of
+  `cdrom`/`cdrom_url` values. May be repeated.
+</ParamField>
+
+<Note>
+  CD-ROM mounting is not supported by **DingusPPC** or **PearPC**. It is also
+  unavailable on **Snow**-backed machines that lack SCSI support, and on
+  sessions using a disk with an MFS (Macintosh File System) subset.
+</Note>
+
+---
+
+## Networking
+
+<ParamField query="appleTalk" type="string">
+  AppleTalk zone name for local networking via the Cloudflare Worker ethernet
+  provider. All sessions that share the same zone name can communicate with each
+  other over a virtual LocalTalk network.
+</ParamField>
+
+<ParamField query="broadcast_channel_ethernet" type="boolean">
+  Set to `"true"` to use the `BroadcastChannel` API for local networking
+  instead of the Cloudflare Worker provider. This keeps traffic entirely within
+  the browser and is useful for connecting multiple tabs or iframes on the same
+  origin without a server.
+</ParamField>
+
+---
+
+## Playback
+
+<ParamField query="paused" type="boolean">
+  Set to `"true"` to start the emulator in a paused state. The machine will not
+  execute until an `emulator_unpause` control event is received, or the user
+  manually resumes it.
+</ParamField>
+
+<ParamField query="auto_pause" type="boolean">
+  Set to `"true"` to automatically pause the emulator when it scrolls out of
+  the browser viewport and resume it when it scrolls back in. Useful for
+  reducing CPU usage on long pages that contain multiple embedded instances.
+</ParamField>
+
+---
+
+## Embed-specific
+
+<ParamField query="screen_update_messages" type="boolean">
+  Set to `"true"` on `/embed` URLs to enable `emulator_screen` postMessage
+  notifications. When active, the emulator posts a message to the parent page
+  containing raw RGBA pixel data each time the screen changes. See
+  [Notification Events](/reference/embed-notification-events) for details on
+  how to receive and render these frames.
+</ParamField>
+
+---
+
+## Debug
+
+<ParamField query="date" type="string">
+  Override the emulated machine's clock with a specific date. The value is
+  parsed by the `fromDateString` helper in `src/lib/dates.ts`. Useful for
+  reproducing date-sensitive bugs or testing software that behaves differently
+  on specific calendar dates.
+</ParamField>
+
+<ParamField query="debug_fallback" type="boolean">
+  Set to `"true"` to force the non-`SharedArrayBuffer` fallback execution mode,
+  even when `SharedArrayBuffer` is available. This replicates the degraded
+  performance environment seen by users whose hosting environment does not set
+  the required `Cross-Origin-Embedder-Policy` header.
+</ParamField>
+
+<ParamField query="debug_audio" type="boolean">
+  Set to `"true"` to enable verbose audio debug logging in the browser console.
+</ParamField>
+
+<ParamField query="debug_log" type="boolean">
+  Set to `"true"` to enable verbose emulator-level logging in the browser
+  console. Effective for **DingusPPC**, **Previous**, and **PearPC**; has no
+  effect on other emulator backends.
+</ParamField>
+
+<ParamField query="debug_paused" type="boolean">
+  Set to `"true"` to start with the emulator's main loop paused at the very
+  first iteration, before any machine code has executed. Unlike the `paused`
+  parameter (which pauses after the machine is running), this halts execution
+  at the lowest level before the emulator loop begins.
+</ParamField>
+
+<ParamField query="debug_trackpad" type="boolean">
+  Set to `"true"` to enable the trackpad debug overlay, which renders a visual
+  indicator of pointer position and touch state on top of the emulated screen.
+</ParamField>
+
+<ParamField query="blue_scsi" type="boolean">
+  Set to `"true"` to enable [BlueSCSI](https://bluescsi.com/) support for the
+  **DingusPPC** emulator. Only recognised when the active emulator backend
+  supports optional BlueSCSI (`emulatorHasOptionalBlueSCSI` returns `true`).
+</ParamField>
+
+<ParamField query="settings" type="string">
+  A JSON-encoded `EmulatorSettings` object that overrides the default emulator
+  settings. Unrecognised keys are ignored; recognised keys are merged over the
+  defaults. The `EmulatorSettings` type is defined in
+  [`src/emulator/ui/settings.ts`](https://github.com/mihaip/infinite-mac/blob/main/src/emulator/ui/settings.ts):
+
+  ```typescript
+  type EmulatorSettings = {
+    swapControlAndCommand: boolean; // default false
+    speed: EmulatorSpeed;           // default -2
+    useMouseDeltas: boolean;        // default false
+    trackpadMode: boolean;          // default false
+    screenScaling?: 'auto' | 'smooth' | 'pixelated';
+  };
+  ```
+
+  Example value: `{"swapControlAndCommand":true,"speed":0}`
+</ParamField>
+
+<ParamField query="edit" type="boolean">
+  Set to `"true"` to open the custom configuration dialog pre-populated with the
+  parameters from the current URL. Also marks the run as custom (`isCustom:
+  true`), which switches the URL display to the `/run?...` form.
+</ParamField>
+
+---
+
+## Example URL
+
+The following embed URL starts a **Quadra 650** running **System 7.5**, mounts the **Infinite HD**, pre-downloads a Macintosh Garden item, enables persistent storage, starts paused, uses 2× pixel scaling, and enables screen frame notifications:
+
+```
+https://infinitemac.org/embed
+  ?machine=Quadra%20650
+  &disk=System%207.5
+  &infinite_hd=true
+  &saved_hd=true
+  &library_url=https%3A%2F%2Fmacintoshgarden.org%2Fapps%2Fsimcity-2000
+  &paused=true
+  &screen_scale=2
+  &screen_update_messages=true
+```
+
+As a single line (for use in an `<iframe src="...">` attribute):
+
+```
+https://infinitemac.org/embed?machine=Quadra%20650&disk=System%207.5&infinite_hd=true&saved_hd=true&library_url=https%3A%2F%2Fmacintoshgarden.org%2Fapps%2Fsimcity-2000&paused=true&screen_scale=2&screen_update_messages=true
+```

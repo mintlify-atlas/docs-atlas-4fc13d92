@@ -1,0 +1,113 @@
+---
+title: "Embedding Infinite Mac in Your Website"
+sidebarTitle: "Overview"
+description: "Embed a fully functional classic Mac emulator in any web page using a single iframe tag, with optional postMessage controls and screen capture."
+---
+
+Infinite Mac can be embedded directly into any web page with a single `<iframe>` tag. The embedded emulator is fully functional — visitors can interact with the classic Mac environment, run software, and use any disk image you configure — all without leaving your page.
+
+## The Embed URL
+
+All embedded emulators use URLs of the form:
+
+```
+https://infinitemac.org/embed?...
+```
+
+Query parameters control which system disk to load, which machine to emulate, screen size, storage options, and more. The iframe's `width` and `height` attributes determine the size of the emulated screen.
+
+## Minimal Example
+
+The following snippet embeds a Quadra 650 running System 7.1 at 640×480:
+
+```html
+<iframe
+  src="https://infinitemac.org/embed?disk=System+7.1&machine=Quadra+650&infinite_hd=true"
+  width="640"
+  height="480"
+  allow="cross-origin-isolated"
+  frameborder="0">
+</iframe>
+```
+
+The `allow="cross-origin-isolated"` attribute is important for best performance — see [SharedArrayBuffer and Performance](#sharedarraybuffer-and-performance) below.
+
+## Generating Embed HTML
+
+The easiest way to build your embed URL is to use the **HTML generator** at [infinitemac.org/embed](https://infinitemac.org/embed). It presents a point-and-click interface where you can choose a system disk, machine model, screen size, storage options, and playback controls, then copies the finished `<iframe>` tag to your clipboard.
+
+## Interactive Testbed
+
+You can experiment with common embedding options — including screen update messages, pause/unpause, mouse and keyboard injection, and disk loading — in the live testbed at [infinitemac.org/embed-testbed.html](https://infinitemac.org/embed-testbed.html). The [testbed source](https://github.com/mihaip/infinite-mac/blob/main/public/embed-testbed.html) is also a useful reference for working postMessage examples.
+
+## SharedArrayBuffer and Performance
+
+Infinite Mac relies on `SharedArrayBuffer` for maximum emulation performance. To enable it inside an iframe you may need to:
+
+1. Serve your **embedding page** with the response header:
+   ```
+   Cross-Origin-Embedder-Policy: require-corp
+   ```
+2. Add the `allow="cross-origin-isolated"` attribute to the `<iframe>` tag (as shown in the example above).
+
+The emulator will still run without `SharedArrayBuffer`, but it falls back to a [hackier worker loop](https://blog.persistent.info/2021/08/worker-loop.html) that is noticeably slower. You can confirm which mode is active by opening the browser console and looking for:
+
+```
+SharedArrayBuffer is not available, fallback mode will be used. Performance may be degraded.
+```
+
+<Tip>
+  If you cannot set server-side headers, you can often use a service worker or a
+  `<meta>` COOP/COEP tag to achieve cross-origin isolation. The emulator will
+  still boot without it — only performance is affected.
+</Tip>
+
+## Complete Working Example
+
+The snippet below is a self-contained HTML page that embeds a System 7.1 Quadra 650 with the Infinite HD software library included:
+
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>My Embedded Mac</title>
+  <!--
+    The Cross-Origin-Embedder-Policy header below enables SharedArrayBuffer
+    inside the iframe for full emulation performance. If you cannot set HTTP
+    headers, remove it — the emulator will still work, just more slowly.
+  -->
+  <meta http-equiv="Cross-Origin-Embedder-Policy" content="require-corp" />
+  <meta http-equiv="Cross-Origin-Opener-Policy" content="same-origin" />
+</head>
+<body>
+  <iframe
+    id="mac"
+    src="https://infinitemac.org/embed?disk=System+7.1&machine=Quadra+650&infinite_hd=true"
+    width="640"
+    height="480"
+    allow="cross-origin-isolated"
+    frameborder="0">
+  </iframe>
+</body>
+</html>
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card
+    title="URL Parameters"
+    icon="sliders"
+    href="/embedding/iframe-parameters">
+    Complete reference for every query parameter accepted by the `/embed`
+    endpoint: disk selection, machine, screen size, storage, and more.
+  </Card>
+  <Card
+    title="postMessage API"
+    icon="message-code"
+    href="/embedding/postmessage-api">
+    Send commands to an embedded emulator and receive status events using
+    the browser's `window.postMessage` API.
+  </Card>
+</CardGroup>

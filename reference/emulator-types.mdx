@@ -1,0 +1,282 @@
+---
+title: "WebAssembly Emulator Cores Used by Infinite Mac"
+sidebarTitle: "Emulator Types"
+description: "Capabilities and limitations of each emulator core: Mini vMac, Basilisk II, SheepShaver, DingusPPC, Previous, PearPC, and Snow."
+---
+
+Infinite Mac runs seven distinct emulator cores in the browser as WebAssembly modules. Each core is compiled from the original C or Rust emulator source and wrapped in a common JavaScript interface. The right emulator is selected automatically based on the machine definition — you never configure this directly. Understanding which core is in use helps explain the differences in available features, mouse handling, networking support, and speed controls across different Mac and NeXT configurations.
+
+## The `EmulatorType` Union
+
+```typescript
+export type EmulatorType =
+    | "BasiliskII"
+    | "SheepShaver"
+    | "Mini vMac"
+    | "DingusPPC"
+    | "Previous"
+    | "PearPC"
+    | "Snow";
+```
+
+## The `EmulatorCpu` Type
+
+```typescript
+export type EmulatorCpu =
+    | "68000"
+    | "68020"
+    | "68030"
+    | "68040"
+    | "601"
+    | "603"
+    | "604"
+    | "G3";
+```
+
+The 68K values correspond to Motorola 68000-family CPUs used in all Macs from 1984 to the early 1990s. The `601`, `603`, `604`, and `G3` values represent IBM/Motorola PowerPC processors used in Power Macintosh computers from 1994 onward. Note that the `603` CPU type is defined but not currently assigned to any machine definition.
+
+## Capability Summary
+
+| Emulator | CPU | AppleTalk | Abs. Mouse | Opt. Rel. Mouse | Debug Log | BlueSCSI | Speed Config |
+|---|---|---|---|---|---|---|---|
+| Mini vMac | 68000–68030 | ✗ | ✓ | ✗ | ✗ | ✗ | `MACEMU` |
+| Basilisk II | 68030–68040 | ✓ | ✓ | ✓ | ✗ | ✗ | `MACEMU` |
+| SheepShaver | 601, 604, G3 | ✓ | ✓ | ✓ | ✗ | ✗ | `MACEMU` |
+| DingusPPC | 601, G3 | ✗ | ✗ (always rel.) | — | ✓ | ✓ | — |
+| Previous | 68030–68040 | ✗ | ✗ (always rel.) | — | ✓ | ✗ | — |
+| PearPC | G3 | ✗ | ✗ (always rel.) | — | ✓ | ✗ | — |
+| Snow | 68000–68030 | ✗ | ✓ | ✓ (restart req.) | ✗ | ✗ | `SNOW` |
+
+---
+
+## Mini vMac
+
+Mini vMac is the original emulator used for the earliest Macintosh hardware. It emulates compact 68K Macs from the original 128K through the Mac IIx, running System 1.0 through System 6.x (and some early System 7 configurations).
+
+**Machines using this emulator:** Mac 128K, Mac 512Ke, Mac Plus, Mac SE, Mac II, Mac IIx
+
+**Emulator subtypes** (`EmulatorMinivMacSubtypes`):
+
+```typescript
+export type EmulatorMinivMacSubtypes =
+    | "128K"
+    | "512Ke"
+    | "Plus"
+    | "SE"
+    | "II"
+    | "IIx";
+```
+
+Each subtype compiles a different Mini vMac variant optimized for that specific hardware model.
+
+### Capabilities
+
+- **Mouse mode**: Absolute coordinates only. Mini vMac does not support relative mouse deltas (`emulatorSupportsMouseDeltas` returns `false`).
+- **Interrupt key**: Mini vMac is the only emulator that uses the programmer's interrupt key (`emulatorUsesInterruptKey` returns `true`). This maps to a keyboard shortcut that triggers the 68K interrupt, useful for debugging or breaking out of hangs.
+- **AppleTalk**: Not supported.
+- **Placeholder disks**: Not used.
+- **Debug log**: Not supported.
+- **BlueSCSI**: Not available.
+- **Speed control**: Uses the `MACEMU` speed config — speeds from `Default` through `1x`, `2x`, `4x`, `8x`, `16x`, `32x`, and `All Out`.
+
+---
+
+## Basilisk II
+
+[Basilisk II](https://basilisk.cebix.net/) emulates 68K Macs with color displays, covering the Mac IIfx through the Quadra series. It supports System 7.x through Mac OS 8.1 and is the only 68K emulator with AppleTalk networking support.
+
+**Machines using this emulator:** Mac IIfx, Quadra 650
+
+### Capabilities
+
+- **Mouse mode**: Absolute coordinates by default. Optionally supports relative mouse deltas (`emulatorSupportsMouseDeltas` returns `true`). Switching does not require a restart.
+- **AppleTalk**: Supported (`emulatorSupportsAppleTalk` returns `true`). Basilisk II and SheepShaver are the only emulators with AppleTalk.
+- **Placeholder disks**: Uses placeholder disk files (`emulatorUsesPlaceholderDisks` returns `true`). The emulator requires disk "slots" to be pre-populated in its preferences even if no real disk is attached.
+- **Debug log**: Not supported.
+- **BlueSCSI**: Not available.
+- **Speed control**: Uses the `MACEMU` speed config (same as Mini vMac). A `speedGovernorTargetIPS` can be set on a machine definition to throttle overall throughput for realistic benchmark scores.
+- **CPU ID mapping**: Basilisk II uses an internal CPU ID: `68020` → `2`, `68030` → `3`, `68040` → `4`.
+
+---
+
+## SheepShaver
+
+[SheepShaver](https://sheepshaver.cebix.net/) emulates PowerPC Macs using NewWorld ROM images. It runs Mac OS 8.x through Mac OS 9.0.4, the last release it supports. Like Basilisk II, it provides AppleTalk networking.
+
+**Machines using this emulator:** Power Macintosh 9500 (604), Power Macintosh G3 Blue & White (G3)
+
+### Capabilities
+
+- **Mouse mode**: Absolute coordinates by default; optionally supports relative mouse deltas (`emulatorSupportsMouseDeltas` returns `true`) without requiring a restart.
+- **AppleTalk**: Supported (`emulatorSupportsAppleTalk` returns `true`).
+- **Placeholder disks**: Uses placeholder disk files (`emulatorUsesPlaceholderDisks` returns `true`), same behavior as Basilisk II.
+- **Debug log**: Not supported.
+- **BlueSCSI**: Not available.
+- **Speed control**: Uses the `MACEMU` speed config.
+
+---
+
+## DingusPPC
+
+[DingusPPC](https://github.com/dingusdev/dingusppc) emulates PowerPC Macs with OldWorld ROM (NuBus and PCI machines). It supports System 7.5.2 through Mac OS 9.1, and is also used for early Mac OS X installations up to 10.1.
+
+**Machines using this emulator:** Power Macintosh 6100, 7200, 7500, G3 Beige, iMac G3 233, Power Macintosh G3 Blue & White (Experimental)
+
+### Capabilities
+
+- **Mouse mode**: Always uses relative mouse deltas (`emulatorNeedsMouseDeltas` returns `true`). Absolute coordinates are not supported; relative mode is automatically engaged for all DingusPPC sessions.
+- **AppleTalk**: Not supported.
+- **Placeholder disks**: Not used.
+- **Debug log**: Supported (`emulatorSupportsDebugLog` returns `true`). When debug logging is requested, the `verboseBootEnvVars` on the machine definition are applied to OpenFirmware to enable verbose boot output.
+- **BlueSCSI**: Optionally supported (`emulatorHasOptionalBlueSCSI` returns `true`). DingusPPC is the only emulator with BlueSCSI support.
+- **Speed control**: None (`emulatorSpeedConfig` returns `undefined`).
+
+<Tip>
+DingusPPC uses named `monitorId` strings in `supportedScreenSizes` (e.g. `"Multiscan17in"`, `"MacRGB15in"`) to tell the emulator which virtual monitor to emulate at each resolution.
+</Tip>
+
+---
+
+## Previous
+
+[Previous](http://previous.alternative.de/) emulates the NeXT hardware family — the NeXT Computer (68030), NeXTcube (68040), NeXTstation (68040), and NeXTstation Turbo Color (68040). It runs NeXTSTEP 0.8 through NeXTSTEP/OPENSTEP 4.2.
+
+**Machines using this emulator:** NeXT Computer, NeXTcube, NeXTstation, NeXTstation Turbo Color
+
+**Emulator subtypes** (`EmulatorPreviousSubtypes`):
+
+```typescript
+export type EmulatorPreviousSubtypes =
+    | "NeXT Computer"
+    | "NeXTcube"
+    | "NeXTstation"
+    | "NeXTstation Turbo Color";
+```
+
+### Capabilities
+
+- **Mouse mode**: Always uses relative mouse deltas (`emulatorNeedsMouseDeltas` returns `true`).
+- **AppleTalk**: Not supported.
+- **Placeholder disks**: Previous expects all configured disk "files" to exist on the filesystem. Empty stub files are created for any unmounted slots (`emulatorNeedsDiskPlaceholderFiles` returns `true`).
+- **Debug log**: Supported (`emulatorSupportsDebugLog` returns `true`).
+- **BlueSCSI**: Not available.
+- **Speed control**: None (`emulatorSpeedConfig` returns `undefined`).
+
+---
+
+## PearPC
+
+[PearPC](https://pearpc.sourceforge.net/) emulates a G3/G4-class PowerPC machine for running early Mac OS X (10.0 Public Beta through 10.4 Tiger). It is the primary emulator for the Mac OS X disk collection.
+
+**Machines using this emulator:** Power Macintosh G4 (PCI Graphics)
+
+### Capabilities
+
+- **Mouse mode**: Always uses relative mouse deltas (`emulatorNeedsMouseDeltas` returns `true`).
+- **AppleTalk**: Not supported.
+- **Placeholder disks**: Not used.
+- **Debug log**: Supported (`emulatorSupportsDebugLog` returns `true`).
+- **BlueSCSI**: Not available.
+- **Speed control**: None (`emulatorSpeedConfig` returns `undefined`).
+
+---
+
+## Snow
+
+Snow is a Rust-based 68K Macintosh emulator developed specifically for Infinite Mac. It is the newest addition to the emulator lineup and aims to provide more accurate hardware emulation than Mini vMac for the same range of machines. Snow covers the Mac 128K through the Mac SE/30.
+
+<Note>
+Snow is the only emulator in Infinite Mac written in Rust rather than C. It is under active development and progressively gains support for additional Mac models and hardware features.
+</Note>
+
+**Machines using this emulator:** Mac 128K (Snow), Mac 512K (Snow), Mac 512Ke (Snow), Mac Plus (Snow), Mac SE (Snow), Mac SE FDHD (Snow), Mac Classic (Snow), Mac II (Snow), Mac II FDHD (Snow), Mac IIx (Snow), Mac IIcx (Snow), Mac SE/30 (Snow)
+
+### Capabilities
+
+- **Mouse mode**: Absolute coordinates by default, with optional relative mode. Unlike Basilisk II and SheepShaver, switching to relative mouse mode **requires a restart** (`emulatorNeedsRestartForMouseDeltas` returns `true`).
+- **AppleTalk**: Not supported.
+- **Placeholder disks**: Not used.
+- **Debug log**: Not supported.
+- **BlueSCSI**: Not available.
+- **Speed control**: Uses its own `SNOW` speed config with different semantics from the `MACEMU` config:
+
+```typescript
+const SNOW_SPEED_CONFIG: EmulatorSpeedConfig = {
+    defaultSpeed: -2,
+    speedOptions: new Map<EmulatorSpeed, string>([
+        [-2, "Accurate"],
+        [7,  "Dynamic"],
+        [-1, "Uncapped"],
+        [9,  "Video"],
+    ]),
+};
+```
+
+The Snow speed values are kept in sync with the speed-handling code in `snow/frontend_im/src/input.rs`.
+
+---
+
+## Speed Configuration Details
+
+Two speed configuration presets are used across the emulators:
+
+<Tabs>
+  <Tab title="MACEMU (Mini vMac, Basilisk II, SheepShaver)">
+```typescript
+const MACEMU_SPEED_CONFIG: EmulatorSpeedConfig = {
+    defaultSpeed: -2,
+    speedOptions: new Map<EmulatorSpeed, string>([
+        [-2, "Default"],
+        [0,  "1x"],
+        [1,  "2x"],
+        [2,  "4x"],
+        [3,  "8x"],
+        [4,  "16x"],
+        [5,  "32x"],
+        [-1, "All Out"],
+    ]),
+};
+```
+
+`-2` means the default speed the emulator was compiled with. `-1` ("All Out") removes all speed limiting and runs as fast as the host CPU allows.
+  </Tab>
+  <Tab title="Snow">
+```typescript
+const SNOW_SPEED_CONFIG: EmulatorSpeedConfig = {
+    defaultSpeed: -2,
+    speedOptions: new Map<EmulatorSpeed, string>([
+        [-2, "Accurate"],
+        [7,  "Dynamic"],
+        [-1, "Uncapped"],
+        [9,  "Video"],
+    ]),
+};
+```
+
+`"Accurate"` targets original hardware timing. `"Dynamic"` adjusts speed based on load. `"Uncapped"` removes all throttling. `"Video"` is optimized for smooth video playback.
+  </Tab>
+</Tabs>
+
+DingusPPC, Previous, and PearPC return `undefined` from `emulatorSpeedConfig` — they expose no speed controls to the user.
+
+## The `EmulatorDef` Discriminated Union
+
+The `EmulatorDef` type enforces that Mini vMac and Previous subtypes are always specified:
+
+```typescript
+export type EmulatorDef =
+    | {
+          emulatorType: Exclude<EmulatorType, "Mini vMac" | "Previous">;
+          emulatorSubtype?: never;
+      }
+    | {
+          emulatorType: "Mini vMac";
+          emulatorSubtype: EmulatorMinivMacSubtypes;
+      }
+    | {
+          emulatorType: "Previous";
+          emulatorSubtype: EmulatorPreviousSubtypes;
+      };
+```
+
+Any machine definition using `emulatorType: "Mini vMac"` must include a valid `emulatorSubtype` from `EmulatorMinivMacSubtypes`, and similarly for Previous. All other emulator types must not have a subtype.

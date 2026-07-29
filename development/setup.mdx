@@ -1,0 +1,87 @@
+---
+title: "Setting Up the Infinite Mac Development Environment"
+sidebarTitle: "Setup"
+description: "Clone the repository, install Node.js and Python dependencies, import disk images, and run the local dev server at localhost:3127."
+---
+
+Infinite Mac is a browser-based classic Macintosh emulator built with React and WebAssembly. The development environment relies on Node.js for the frontend toolchain and Python (via `uv`) for the disk and library import scripts. Before you can run the dev server, you need to generate a set of supporting data files — disk images, CD-ROM stubs, and a software library — from the import scripts.
+
+## Prerequisites
+
+Make sure the following are installed before you begin:
+
+- **Node.js ≥ 22** and **npm** — required by the project (`engines.node >= 22.0.0` in `package.json`)
+- **git** — needed to clone the repository with its submodules
+- **Python via [uv](https://docs.astral.sh/uv/)** — the import scripts (`import-disks`, `import-cd-roms`, `import-library`) are Python programs invoked through `uv run`
+- **Docker** — only required if you intend to rebuild emulator WASM binaries from source; not needed for normal development
+
+## Setup Steps
+
+<Steps>
+  <Step title="Clone with submodules">
+    Infinite Mac keeps all emulator cores (Basilisk II, SheepShaver, Mini vMac, etc.) as Git submodules. You must clone recursively to fetch them:
+
+    ```bash
+    git clone --recursive https://github.com/mihaip/infinite-mac.git
+    cd infinite-mac
+    ```
+
+    If you already have a checkout and are missing the submodule contents, initialise them now:
+
+    ```bash
+    git submodule update --init --recursive
+    ```
+  </Step>
+
+  <Step title="Install Node.js dependencies">
+    Install all npm packages declared in `package.json`, including Vite, wrangler, and the ESLint/Prettier toolchain:
+
+    ```bash
+    npm install
+    ```
+  </Step>
+
+  <Step title="Build native tools">
+    The project ships helper programs that must be compiled before the import scripts can run. This step builds them:
+
+    ```bash
+    npm run build-tools
+    ```
+  </Step>
+
+  <Step title="Import minimal disk images">
+    Three import commands generate the data files the app needs at runtime. Pass the flags shown below for a fast, development-only setup:
+
+    ```bash
+    npm run import-disks minimal
+    npm run import-cd-roms placeholder
+    npm run import-library placeholder
+    ```
+
+    **What each flag does:**
+
+    | Command | Flag | Effect |
+    |---|---|---|
+    | `import-disks` | `minimal` | Builds System 1 through System 7.5.5 only; skips populating the "Infinite HD" disk image with the full software library |
+    | `import-cd-roms` | `placeholder` | Creates an empty CD-ROM library stub so the app loads without errors |
+    | `import-library` | `placeholder` | Generates a minimal downloads library that does not require a Macintosh Garden data dump |
+
+    <Note>
+      During `import-disks`, the native macOS versions of Mini vMac and Basilisk II are invoked as a final step to ensure the generated disk has a valid desktop database. If they are not installed on your machine, a warning is logged and the generated disk may take longer to mount inside the emulator. Once each emulator appears to have finished booting and you can see the Infinite HD volume, use the **Shut Down** command to cleanly power off the emulated machine, then quit the emulator so the import task can continue.
+    </Note>
+
+    <Tip>
+      The Mini vMac desktop-database step can be slow at the emulator's default speed. To speed it up, press **Control-S** inside the Mini vMac window to open the speed menu, then press **A** to select **All Out**.
+    </Tip>
+  </Step>
+
+  <Step title="Start the development server">
+    Launch the Vite dev server:
+
+    ```bash
+    npm run start
+    ```
+
+    The app is served at **http://localhost:3127**. The server is configured with the `Cross-Origin-Opener-Policy` and `Cross-Origin-Embedder-Policy` headers required for `SharedArrayBuffer`, which the emulator workers depend on.
+  </Step>
+</Steps>

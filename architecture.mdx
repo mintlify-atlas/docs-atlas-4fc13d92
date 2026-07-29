@@ -1,0 +1,195 @@
+---
+title: "How Infinite Mac Works: Architecture Overview"
+sidebarTitle: "Architecture"
+description: "Infinite Mac compiles classic Mac emulators to WebAssembly and serves them via Cloudflare Workers, with chunked disk images stored in Cloudflare R2."
+---
+
+Infinite Mac is a full-stack TypeScript application whose central trick is compiling decades-old C and C++ emulator source code to WebAssembly so it can run inside a browser. Understanding how the pieces connect — from the React UI down to a chunked disk image sitting in an R2 bucket — makes it much easier to work on any part of the system.
+
+## High-Level Architecture
+
+```
+Browser
+  └── React frontend  (Vite / React 18)
+        ├── Main thread   src/emulator/ui/
+        │     ├── Reads RunDef from URL
+        │     ├── Configures emulator (screen, audio, input, disks)
+        │     └── Communicates with worker via SharedArrayBuffer or postMessage
+        └── Web Worker    src/emulator/worker/
+              ├── Runs WASM emulator binary
+              └── Fetches disk image chunks on-demand over HTTP
+
+Cloudflare Worker   worker/
+  ├── SSR: renders initial HTML shell
+  ├── Serves static assets from ASSETS binding
+  └── EthernetZone Durable Object (AppleTalk networking)
+
+Cloudflare R2  (bucket: infinite-mac-disk)
+  └── Chunked disk image files  (*.chunk)
+```
+
+Every request to `infinitemac.org` (and the shortcut domains) is handled by the Cloudflare Worker defined in `worker/index.ts`. The worker serves the React app shell via server-side rendering, delegates static asset delivery to the Cloudflare Assets binding, and exposes a WebSocket endpoint used by the `EthernetZone` Durable Object to bridge AppleTalk packets between sessions.
+
+## The `RunDef` Data Model
+
+Every emulator session is fully described by a `RunDef` value defined in `src/defs/run-def.ts`:
+
+```typescript
+export type RunDef = {
+    machine: MachineDef;
+    ramSize?: MachineDefRAMSize;
+    screenSize: ScreenSize;
+    screenScale?: number;
+    disks: SystemDiskDef[];
+    diskFiles: DiskFile[];
+    cdromURLs: string[];
+    cdromPrefetchChunks: number[][];
+    diskURLs?: string[];
+    diskPrefetchChunks?: number[][];
+    includeInfiniteHD: boolean;
+    includeSavedHD: boolean;
+    includeLibrary: boolean;
+    libraryDownloadURLs: string[];
+    ethernetProvider?: EmulatorEthernetProvider;
+    debugFallback?: boolean;
+    debugPaused?: boolean;
+    flags: EmulatorConfigFlags;
+    isCustom?: boolean;
+    isEmbed?: boolean;
+    screenUpdateMessages?: boolean;
+    settings?: EmulatorSettings;
+};
+```
+
+`RunDef` is the single source of truth for what the emulator will boot. Two functions — `runDefFromUrl` and `runDefToUrl` — serialise and deserialise this structure to and from the page URL, making every session fully bookmarkable and shareable. Year-indexed paths like `/1984/System%201.0` are normalised into a `RunDef` by `runDefFromUrl`; the custom `/run` and `/embed` routes use explicit query parameters for each field.
+
+## Emulator Integration Layers
+
+The emulator code is split across three directories with clearly separated responsibilities:
+
+### `src/emulator/common/` — Shared types and utilities
+
+Contains types and functions used by both the main thread and the worker. The most important export is `EmulatorChunkedFileSpec`, which describes a disk image as an array of content-addressed chunks:
+
+```typescript
+export type EmulatorChunkedFileSpec = {
+    name: string;
+    baseUrl: string;
+    totalSize: number;
+    chunks: string[];      // content hashes, one per chunk
+    chunkSize: number;
+    prefetchChunks: number[];
+    persistent?: boolean;
+    isFloppy?: boolean;
+    hasDeviceImageHeader?: boolean;
+};
+```
+
+`common.ts` also defines `EmulatorWorkerConfig` (the full serialisable configuration passed from the main thread to the worker), `InputBufferAddresses` (the fixed memory layout of the shared input buffer), and all `EmulatorInputEvent` variants (mouse, keyboard, speed, pause).
+
+### `src/emulator/ui/` — Main thread driver
+
+The UI layer runs on the browser's main thread and owns everything the user sees and interacts with. Key modules:
+
+- **`ui.ts`** — the `Emulator` class; orchestrates startup, manages the worker lifecycle, and exposes the public API consumed by React components
+- **`config.ts`** — translates a `RunDef` into an `EmulatorWorkerConfig` by resolving disk specs, ROM paths, and prefs files
+- **`video.ts`** — reads the emulator's framebuffer (via `SharedArrayBuffer` or fallback `postMessage`) and blits it to a `<canvas>`
+- **`input.ts`** — translates browser mouse and keyboard events into `EmulatorInputEvent` values and writes them into the shared input buffer
+- **`audio.ts`** — routes emulator audio output through a Web Audio `AudioWorkletNode`
+- **`files.ts`** — handles drag-and-drop file uploads and directory extractions
+- **`ethernet.ts`** — connects an `EmulatorEthernetProvider` (Cloudflare Worker or BroadcastChannel) to the emulator's network interface
+
+### `src/emulator/worker/` — Worker runtime
+
+The worker thread runs the WASM emulator binary and handles all emulator-side I/O:
+
+- **`worker.ts`** — entry point; receives `EmulatorWorkerConfig`, instantiates the correct emulator, and drives the main loop
+- **`chunked-disk.ts`** — implements `EmulatorWorkerDisk` by fetching disk chunks synchronously over XHR (valid in workers) as the emulator requests sectors
+- **`disks.ts`** — assembles the full set of `EmulatorWorkerDisk` instances from the config, including the Infinite HD image, Saved HD, and any uploaded disk files
+- **`emscripten/`** — pre-built WASM binaries and their Emscripten JS glue for all seven emulator cores
+
+<Info>
+  The WASM binaries in `src/emulator/worker/emscripten/` are pre-built and committed directly to the Git repository. You do **not** need Docker or Emscripten to work on the frontend or import scripts — rebuilding the emulator cores is only necessary when making changes to the C/C++ emulator source in the submodules. See the README for Docker-based build instructions for each core.
+</Info>
+
+## Chunked Disk Images
+
+Disk images for classic Mac systems can be hundreds of megabytes. Infinite Mac avoids loading them in full by splitting each image into fixed-size chunks and serving them lazily as the emulator requests sectors.
+
+The chunking pipeline (run by `npm run import-disks`) works as follows:
+
+1. A raw disk image is split into `chunkSize`-byte blocks (typically 256 KB per chunk for hard disk images, 128 KB for CD-ROMs).
+2. Each non-zero chunk is content-addressed: its SHA-1 hash becomes its filename (`<hash>.chunk`).
+3. Zero-filled chunks (empty disk space) are omitted from the manifest entirely — a missing entry means "synthesise a zeroed block".
+4. A JSON manifest (`EmulatorChunkedFileSpec`) is written alongside the chunks and imported as a dynamic ES module by the React app at runtime.
+
+At emulation time, `EmulatorWorkerChunkedDisk` in the worker fulfils every sector read by looking up the corresponding chunk index, fetching the URL synchronously if it hasn't been loaded yet, and caching it in a `Map<number, Uint8Array>`. Writes go to the same in-memory cache (they are never persisted back to R2, except for the Saved HD which uses the Origin Private File System).
+
+**Prefetch hints** — Each `SystemDiskDef` carries a `prefetchChunks` array listing the chunk indices needed to boot the system. The UI layer requests these in parallel before the emulator starts, cutting boot latency by eliminating the first round of synchronous XHR stalls.
+
+```typescript
+export function generateChunkUrl(
+    spec: Pick<EmulatorChunkedFileSpec, "baseUrl" | "chunks">,
+    chunk: number
+): string {
+    // The chunk number is embedded in the URL fragment so that chunks with
+    // identical content (same hash, different positions) still cache correctly.
+    return `${spec.baseUrl}/${spec.chunks[chunk]}.chunk#${chunk}`;
+}
+```
+
+## SharedArrayBuffer and the Fallback Mode
+
+The highest-performance communication path between the main thread and the emulator worker relies on `SharedArrayBuffer`. The input buffer (keyboard/mouse events), video framebuffer, audio ring buffer, file-transfer buffer, and Ethernet receive buffer are all `SharedArrayBuffer` instances allocated once and handed to both sides at startup. This eliminates serialisation overhead and lets the worker spin-wait on an atomic lock rather than yield to the event loop.
+
+`SharedArrayBuffer` requires the page to be served with two HTTP headers:
+
+```
+Cross-Origin-Opener-Policy: same-origin
+Cross-Origin-Embedder-Policy: require-corp
+```
+
+Both the Vite dev server and the production Cloudflare Worker set these headers. When they are absent (for example when Infinite Mac is embedded in a third-party `<iframe>` that does not opt in), the code automatically falls back to a `postMessage`-based mode where each subsystem has a corresponding `EmulatorWorkerFallback*Config` variant. The fallback is functionally complete but has higher latency.
+
+The `debugFallback` flag in `RunDef` (exposed as the `?debug_fallback=true` query parameter) forces the fallback path even on a correctly-isolated page, which is useful for testing that mode without a special embedding environment.
+
+## Directory Structure
+
+```
+infinite-mac/
+├── src/                     # Frontend React app and assets
+│   ├── app/                 # Main UI pages and components
+│   │   ├── App.tsx          # Root component; routes to Browser/Mac/Custom/Embed
+│   │   ├── Browser.tsx      # Disk-browser listing view
+│   │   ├── Mac.tsx          # Running emulator view
+│   │   └── Custom.tsx       # /run custom configuration builder
+│   ├── controls/            # Reusable UI widgets (buttons, dialogs, inputs)
+│   ├── defs/                # Type-safe data definitions
+│   │   ├── machines.ts      # MachineDef constants for every emulated model
+│   │   ├── disks.ts         # SystemDiskDef for every OS release
+│   │   └── run-def.ts       # RunDef type + runDefFromUrl / runDefToUrl
+│   ├── emulator/            # Emulator integration
+│   │   ├── ui/              # Main-thread driver (video, audio, input, files)
+│   │   ├── worker/          # Worker runtime + WASM binaries
+│   │   │   └── emscripten/  # Pre-built WASM emulator binaries
+│   │   └── common/          # Shared types (EmulatorChunkedFileSpec, InputBuffer…)
+│   ├── net/                 # Ethernet providers (Cloudflare Worker, BroadcastChannel)
+│   ├── monkey/              # Infinite Monkey LLM-based computer-use demo
+│   └── Data/                # ROMs, disk manifests, prefs files (generated)
+├── worker/                  # Cloudflare Worker (SSR, asset serving, EthernetZone DO)
+├── scripts/                 # Import and deployment helper scripts
+├── Library/                 # Infinite HD software library (JSON manifests + zips)
+├── CD-ROMs/                 # CD-ROM library metadata
+├── Images/                  # System disk images used by import-disks
+└── public/                  # Static files served as-is
+```
+
+## Cloudflare Infrastructure
+
+The `wrangler.jsonc` at the repo root describes the complete production deployment:
+
+- **Assets binding** — the `build/` directory is served as a static site with `single-page-application` fallback, so all URLs resolve to the React app shell
+- **R2 bucket** (`infinite-mac-disk`) — chunked disk image files are synced here by `npm run sync-disks` and served by the Worker under the `/disk/` path prefix
+- **KV namespace** (`VARZ`) — stores lightweight counters and telemetry variables
+- **Durable Object** (`EthernetZone`) — one instance per named AppleTalk zone; bridges WebSocket connections from multiple browser sessions so they can exchange raw Ethernet frames
+- **Routes** — `system6.app`, `system7.app`, `macos8.app`, `macos9.app`, `kanjitalk7.app`, and `infinitemac.org` (plus their `*.` wildcard subdomains) all route to the same Worker

@@ -1,47 +1,102 @@
 ---
-title: "Quickstart"
-description: "Begin with a guide on the fastest path to a successful outcome"
+title: "Get Started with Infinite Mac Development"
+sidebarTitle: "Quickstart"
+description: "Clone the Infinite Mac repository, install dependencies, import disk images, and start the local development server in a few commands."
 ---
 
-Describe how someone begins using your product. What is the first thing they need to do? Are there any prerequisites?
-
-A quickstart should take someone from zero to using your product. They'll get a quick win and a sense of what they can accomplish.
+Infinite Mac is a full-stack TypeScript project: a React frontend built with Vite, a Cloudflare Worker backend, and a set of Python-based import scripts that produce the chunked disk images served at runtime. This guide walks you through the fastest path to a working local development environment.
 
 ## Prerequisites
 
-Before you begin, you must have:
+Before you begin, make sure the following are available on your system:
 
-- Requirement one (for example, Node.js 18+, a free account, an API key)
-- Requirement two (for example, a compatible device, a compatible browser, a compatible operating system)
+- **Node.js ≥ 22** — the project uses `npm` workspaces and top-level `await` in scripts
+- **npm** — bundled with Node.js; used for all dependency management and task running
+- **git** with submodule support — emulator source trees (Basilisk II, SheepShaver, Mini vMac, DingusPPC, Previous, PearPC, Snow) are included as submodules
+- **Python** (via [`uv`](https://github.com/astral-sh/uv)) — several import scripts are Python-based and rely on `uv` for environment management
 
-## Get started
+<Note>
+  The `minimal` disk import flag used in Step 3 builds only **System 1 through System 7.5.5** — a subset that is fully sufficient for day-to-day frontend development. Building the complete library with all OS releases and the full Infinite HD software collection requires additional large disk images and significant processing time.
+</Note>
+
+## Setup Steps
 
 <Steps>
-  <Step title="Install">
-    Describe how to install your product or sign up.
+  <Step title="Clone the repository with submodules">
+    Infinite Mac embeds each emulator core as a Git submodule. Pass `--recursive` when cloning so all submodules are initialised in one step:
 
     ```bash
-    npm install your-package
+    git clone --recursive https://github.com/mihaip/infinite-mac.git
+    cd infinite-mac
+    ```
+
+    If you already have a non-recursive checkout, initialise the submodules retroactively:
+
+    ```bash
+    git submodule update --init --recursive
     ```
   </Step>
-  <Step title="Configure">
-    Describe any setup or configuration needed before first use.
+
+  <Step title="Install Node dependencies and build tools">
+    Install JavaScript dependencies and then build the native tooling helpers:
 
     ```bash
-    your-cli init
+    npm install
+    npm run build-tools
     ```
+
+    `build-tools` compiles any native Node add-ons and helper utilities used by the import scripts.
   </Step>
-  <Step title="Run it">
-    Show the first thing a user does to see it working.
+
+  <Step title="Import minimal disk images">
+    Three separate import commands populate the data files that the emulator needs at runtime. Run them in order:
 
     ```bash
-    your-cli start
+    # Build System 1–7.5.5 disk images, chunked for lazy loading
+    npm run import-disks minimal
+
+    # Create an empty CD-ROM library placeholder
+    npm run import-cd-roms placeholder
+
+    # Create a minimal software library (no Macintosh Garden data dump required)
+    npm run import-library placeholder
     ```
+
+    Each command writes output into `src/Data/` and related directories. The `minimal` and `placeholder` flags keep the process fast by skipping the full software library build, which would otherwise download and package thousands of additional files.
+
+    After `import-disks` completes, you may see a warning that native Mini vMac or Basilisk II binaries were not found. This is safe to ignore for development — it only affects the desktop database rebuild step that speeds up initial disk mounting on real hardware.
+  </Step>
+
+  <Step title="Start the local development server">
+    Launch the Vite dev server:
+
+    ```bash
+    npm run start
+    ```
+
+    The server starts at **[http://localhost:3127](http://localhost:3127)** and serves the full disk browser UI. Hot module replacement is enabled, so React component changes are reflected in the browser without a full reload.
+
+    The dev server sets the required cross-origin isolation headers automatically (both `Cross-Origin-Opener-Policy: same-origin` and `Cross-Origin-Embedder-Policy: require-corp`) so that `SharedArrayBuffer` — needed for the high-performance shared-memory communication path between the main thread and the emulator Web Worker — is available without any extra browser flags.
   </Step>
 </Steps>
 
-<Tip>
-  Give people a way to get help. This could be a link to a support page, a chat with a customer support agent, or a forum for your product.
+## What You'll See
 
-  Example: Need help? Reach out to us at [support@yourcompany.com](mailto:support@yourcompany.com).
+Once the server is running, navigating to [http://localhost:3127](http://localhost:3127) shows the full disk browser listing every imported OS release organised by year. Clicking a release boots the emulator for that system directly in the browser. With the `minimal` import, releases from 1984 through 1995 (System 1.0 through System 7.5.5) will be available.
+
+## Useful Commands
+
+<Tip>
+  After running `npm run build` to produce a production bundle in the `build/` directory, use `npm run preview` to serve those assets locally via Vite's preview server. It listens on **https://localhost:4127** (with a self-signed certificate) and applies the same cross-origin isolation headers as the dev server, making it the closest local approximation of the production Cloudflare Worker environment without deploying.
 </Tip>
+
+| Command | Description |
+|---------|-------------|
+| `npm run start` | Run local dev server at http://localhost:3127 |
+| `npm run build` | Produce a production build in `build/` |
+| `npm run preview` | Serve the production build at https://localhost:4127 |
+| `npm run worker-dev` | Preview the Cloudflare Worker locally at http://localhost:3128 (requires a prior `build`) |
+| `npm run worker-deploy` | Build and deploy to the live Cloudflare Worker |
+| `npm run import-disks` | Rebuild all disk images (omit `minimal` for the full set) |
+| `npm run import-emulator <name>` | Copy freshly-compiled WASM from an emulator submodule into `src/emulator/worker/emscripten/` |
+| `npm run sync-disks` | Sync chunked disk images to the Cloudflare R2 bucket via rclone |

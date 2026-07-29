@@ -1,0 +1,189 @@
+---
+title: "Building Emulator Cores from Source"
+sidebarTitle: "Emulators"
+description: "Rebuild any of the six WebAssembly emulator cores — Basilisk II, SheepShaver, Mini vMac, DingusPPC, Previous, PearPC, or Snow — using the Emscripten Docker image."
+---
+
+Infinite Mac runs classic Macintosh software through WebAssembly builds of several open-source emulator cores. The compiled `.wasm` and `.js` binaries are already checked into the repository under `src/emulator/worker/emscripten/`, so you only need to rebuild them if you are making changes to the emulator source itself. The build environment is fully containerised — a single Docker image bundles the Emscripten SDK, Rust toolchain, and all supporting libraries needed to compile every core.
+
+## Emulator Submodules
+
+Each emulator is included as a Git submodule. Their upstream repositories are:
+
+| Emulator | Repository |
+|---|---|
+| Basilisk II | https://github.com/mihaip/macemu |
+| SheepShaver | https://github.com/mihaip/macemu |
+| Mini vMac | https://github.com/mihaip/minivmac |
+| DingusPPC | https://github.com/mihaip/dingusppc |
+| Previous | https://github.com/mihaip/previous |
+| PearPC | https://github.com/mihaip/pearpc |
+| Snow | Rust crate included in the `snow` submodule; targets `wasm32-unknown-emscripten` |
+
+## Build the Docker Image
+
+The `Dockerfile` at the repository root installs Ubuntu 24.04, the Emscripten SDK (version 4.0.22), Rust 1.95.0, and all C/C++ build dependencies. Build the image once before compiling any emulator:
+
+```bash
+docker build -t macemu_emsdk .
+```
+
+<Tip>
+  To rebuild every emulator core in one shot and automatically copy the outputs into `src/emulator/worker/emscripten/`, run the convenience script from the repository root:
+
+  ```bash
+  scripts/rebuild-and-import-emulators.sh
+  ```
+
+  This script opens a shell inside the container, runs `/scripts/rebuild-all-emulators.sh` inside it, and then calls `npm run import-emulator` for each of the twelve targets (`basiliskii`, `sheepshaver`, `minivmac-Plus`, `minivmac-128K`, `minivmac-512Ke`, `minivmac-SE`, `minivmac-II`, `minivmac-IIx`, `dingusppc`, `previous`, `pearpc`, `snow`).
+</Tip>
+
+<Note>
+  To open an interactive shell inside the Docker container for manual builds, run:
+
+  ```bash
+  scripts/docker-shell.sh
+  ```
+
+  All paths referenced in the per-emulator build instructions below are paths inside this container.
+</Note>
+
+## Per-Emulator Build Instructions
+
+After building, run `npm run import-emulator <name>` from the host to copy the compiled output into `src/emulator/worker/emscripten/`.
+
+<Tabs>
+  <Tab title="Basilisk II">
+    Basilisk II requires a bootstrap step to generate the CPU emulator code before the WASM configure and compile steps:
+
+    ```bash
+    cd /macemu/BasiliskII/src/Unix
+    # Generate the CPU emulator source
+    ./_embootstrap.sh
+    # Configure for WASM output
+    ./_emconfigure.sh
+    # Compile
+    make -j8
+    ```
+
+    Then from the host:
+
+    ```bash
+    npm run import-emulator basiliskii
+    ```
+  </Tab>
+
+  <Tab title="SheepShaver">
+    SheepShaver does not need a bootstrap step:
+
+    ```bash
+    cd /macemu/SheepShaver/src/Unix
+    ./_emconfigure.sh
+    make -j8
+    ```
+
+    Then from the host:
+
+    ```bash
+    npm run import-emulator sheepshaver
+    ```
+  </Tab>
+
+  <Tab title="Mini vMac">
+    Mini vMac is compiled into multiple model variants. `emscripten_setup.sh` configures the build; pass model flags to select the target machine:
+
+    ```bash
+    cd /minivmac
+    # Default: Mac Plus
+    ./emscripten_setup.sh
+    # Or select a specific model:
+    #   Mac 128K (runs at 1× speed by default for realism):
+    #     ./emscripten_setup.sh -m 128K -speed z
+    #   Mac 512Ke:
+    #     ./emscripten_setup.sh -m 512Ke
+    #   Mac SE:
+    #     ./emscripten_setup.sh -m SE
+    #   Mac II:
+    #     ./emscripten_setup.sh -m II
+    #   Mac IIx (32 MB RAM):
+    #     ./emscripten_setup.sh -m IIx -mem 32M
+    make -j8
+    ```
+
+    Then from the host, specify the matching model suffix:
+
+    ```bash
+    npm run import-emulator minivmac-Plus
+    # or: minivmac-128K, minivmac-512Ke, minivmac-SE, minivmac-II, minivmac-IIx
+    ```
+
+    See the [Mini vMac build options reference](https://www.gryphel.com/c/minivmac/options.html) for the full list of configuration flags.
+  </Tab>
+
+  <Tab title="DingusPPC">
+    DingusPPC uses CMake with the Emscripten wrapper `emcmake`:
+
+    ```bash
+    cd /dingusppc
+    mkdir -p build
+    cd build
+    emcmake cmake -DCMAKE_BUILD_TYPE=Release ..
+    make dingusppc -j8
+    ```
+
+    Then from the host:
+
+    ```bash
+    npm run import-emulator dingusppc
+    ```
+  </Tab>
+
+  <Tab title="Previous">
+    Previous is also CMake-based. The `ENABLE_RENDERING_THREAD=0` flag is required for the WASM build:
+
+    ```bash
+    cd /previous
+    mkdir -p build
+    cd build
+    emcmake cmake -DCMAKE_BUILD_TYPE=Release -DENABLE_RENDERING_THREAD=0 ..
+    make previous -j8
+    ```
+
+    Then from the host:
+
+    ```bash
+    npm run import-emulator previous
+    ```
+  </Tab>
+
+  <Tab title="PearPC">
+    PearPC uses the same configure-then-make pattern as Basilisk II and SheepShaver:
+
+    ```bash
+    cd /pearpc
+    ./_emconfigure.sh
+    make -j8
+    ```
+
+    Then from the host:
+
+    ```bash
+    npm run import-emulator pearpc
+    ```
+  </Tab>
+
+  <Tab title="Snow">
+    Snow is a Rust-based emulator and is compiled with Cargo targeting the `wasm32-unknown-emscripten` target (installed into the Docker image by the Dockerfile):
+
+    ```bash
+    cd /snow
+    cargo build -r -p snow_frontend_im --target wasm32-unknown-emscripten
+    ```
+
+    Then from the host:
+
+    ```bash
+    npm run import-emulator snow
+    ```
+  </Tab>
+</Tabs>

@@ -1,0 +1,238 @@
+---
+title: "System Disk Definitions and Disk Types"
+sidebarTitle: "Disks"
+description: "Reference for SystemDiskDef, EmulatorDiskDef, and DiskFile types: display names, release dates, preferred machines, appearance, and Infinite HD subsets."
+---
+
+Infinite Mac organizes bootable disk images through a hierarchy of TypeScript types defined in `src/defs/disks.ts`. Every system disk — from System 1.0 through Mac OS X 10.4 Tiger and NeXTSTEP 3.3 — is described by a `SystemDiskDef` object that carries its display metadata, the preferred machine to run it on, and the chunked file manifest used to stream the disk image to the browser. Lower-level `EmulatorDiskDef` objects describe auxiliary disks (Infinite HD, Saved HD) that are not full OS installations. Drag-and-drop uploads are represented by the `DiskFile` type.
+
+## The `EmulatorDiskDef` Type
+
+`EmulatorDiskDef` is the base type for any disk that can be mounted by an emulator:
+
+```typescript
+export type EmulatorDiskDef = {
+    generatedSpec: () => Promise<{default: GeneratedChunkedFileSpec}>;
+    prefetchChunks: number[];
+    persistent?: boolean;
+    isFloppy?: boolean;
+    hasDeviceImageHeader?: boolean;
+    extraMachineFiles?: Map<MachineDef, {[fileName: string]: string}>;
+};
+```
+
+### Fields
+
+**`generatedSpec`** — A lazy dynamic import returning the chunked file manifest for this disk. Manifests can be large, so they are loaded on demand rather than bundled up-front.
+
+**`prefetchChunks`** — An array of chunk indices that are eagerly fetched before the emulator starts. These are the chunks most likely needed during early boot, reducing perceived startup latency. The values are semi-automatically generated and validated at build time via `validateSpecPrefetchChunks()`.
+
+**`persistent`** — When `true`, writes to this disk are stored in the browser's [Origin Private File System (OPFS)](https://developer.mozilla.org/en-US/docs/Web/API/File_System_API/Origin_private_file_system) and survive page reloads. Used for the `SAVED_HD` disk.
+
+**`isFloppy`** — When `true`, the disk is presented to the emulator as a floppy drive rather than a hard disk. This affects how Mini vMac and other emulators mount it.
+
+**`hasDeviceImageHeader`** — When `true`, the disk image already contains a full partition map (APM device image header) and does not need one appended by the emulator layer. Used for Mac OS X disk images that target DingusPPC.
+
+**`extraMachineFiles`** — A `Map<MachineDef, {...}>` providing per-machine auxiliary files (e.g. `nvram.bin`, `pram.bin`) to inject into the emulator's Emscripten filesystem at boot. Used for DingusPPC-based Mac OS X disks that need machine-specific NVRAM state.
+
+## The `SystemDiskDef` Type
+
+`SystemDiskDef` extends `EmulatorDiskDef` with all the metadata shown in the browser UI:
+
+```typescript
+export type SystemDiskDef = EmulatorDiskDef & {
+    displayName: string;
+    displaySubtitle?: string;
+    releaseDate: [year: number, month: number, date: number];
+    customDate?: Date;
+    description: string;
+    preferredMachine: MachineDef;
+    appleTalkSupported?: boolean;
+    infiniteHdSubset?: "mfs" | "system6" | "macosx";
+    delayAdditionalDiskMount?: boolean;
+    appearance?: Appearance;
+    appearanceVariant?: AppearanceVariant;
+    isUnstable?: boolean;
+    notable?: boolean;
+    hiddenInBrowser?: boolean;
+    needsMouseDeltas?: boolean;
+};
+```
+
+### Fields
+
+**`displayName`** — The primary name shown in the browser list and used in URLs. For example, `"System 7.5"` or `"Mac OS X 10.2"`.
+
+**`displaySubtitle`** — An optional secondary label displayed alongside the name. Examples: `"Pro"` (System 7.1.1 Pro), `"Jaguar"` (Mac OS X 10.2), `"PowerPC"` (System 7.5.3 PowerPC edition).
+
+**`releaseDate`** — A `[year, month, day]` tuple representing the historical release date. Used to group disks by year in `DISKS_BY_YEAR` and to set the emulated machine's clock.
+
+**`customDate`** — Overrides the date set in the emulated machine. Used sparingly, for example Mac OS X 10.0 Public Beta sets `customDate` to avoid a built-in time-bomb in that release.
+
+**`description`** — A prose paragraph shown in the browser describing notable features of this OS version.
+
+**`preferredMachine`** — The `MachineDef` instance that is automatically selected when launching this disk. For example, System 1.0 defaults to `MAC_128K`, while Mac OS 9.0 defaults to `POWER_MACINTOSH_G3_BW`.
+
+**`appleTalkSupported`** — When `true`, the AppleTalk networking option is enabled for this disk. Present from System 7.0 onward through Mac OS 9.x; absent for early System software and Mac OS X images.
+
+**`infiniteHdSubset`** — Restricts which subset of the Infinite HD library is mounted alongside this disk:
+
+| Value | When used | Library disk |
+|---|---|---|
+| `"mfs"` | Early MFS-only systems (System 1.0–2.0) | `INFINITE_HD_MFS` (floppy) |
+| `"system6"` | System 2.1 through System 6.x | `INFINITE_HD6` |
+| `"macosx"` | Mac OS X disks | `INFINITE_HDX` |
+| _(absent)_ | System 7.0 through Mac OS 9 | `INFINITE_HD` |
+
+**`delayAdditionalDiskMount`** — When `true`, supplementary disks (such as Infinite HD) are mounted after the OS has fully booted rather than at initial startup. Used for System 1.0, where mounting additional images at startup causes issues under Mini vMac.
+
+**`appearance`** — The visual theme of the OS. One of `"Classic"` (pre-Mac OS 8 look), `"Platinum"` (Mac OS 8/9 Platinum appearance), `"Aqua"` (Mac OS X), or `"NeXT"`. Controls how the browser renders UI chrome around the emulated screen.
+
+**`appearanceVariant`** — A sub-variant of the appearance theme, e.g. `"System7"` for the transitional System 7.x look, or `"Pinstripes"` for the late-90s iMac era.
+
+**`notable`** — When `true`, the disk appears in the "Notable" filter in the browser. Notable disks represent historically significant releases: System 1.0, System 2.0, System 2.1, System 3.0, System 5.0, System 6.0, System 6.0.5, System 7.0, System 7.5, System 7.5.3, KanjiTalk 7.5.3, Mac OS 7.6, Mac OS 8.0, Mac OS 8.1, Mac OS 8.5, Mac OS 9.0, and every Mac OS X release.
+
+**`hiddenInBrowser`** — When `true`, the disk is not shown in the main browser list but remains accessible via a direct URL. This is used for releases that are redundant (e.g. minor updates superseded by a later patch) or for internal purposes.
+
+**`needsMouseDeltas`** — When `true`, automatically enables relative mouse mode for this disk. This is necessary for operating systems whose mouse driver is incompatible with absolute coordinate input.
+
+**`isUnstable`** — Marks the disk as potentially unreliable. All Mac OS X disk images currently carry this flag.
+
+## The `DiskFile` Type
+
+```typescript
+export type DiskFile = {
+    file: File;
+    treatAsCDROM: boolean;
+    treatAsFloppy: boolean;
+    hasDeviceImageHeader?: boolean;
+};
+```
+
+`DiskFile` wraps a browser [`File`](https://developer.mozilla.org/en-US/docs/Web/API/File) object for images the user drags and drops into the browser window. The `treatAsCDROM` and `treatAsFloppy` flags tell the emulator how to present the device, and `hasDeviceImageHeader` mirrors the same field on `EmulatorDiskDef`.
+
+## The `PlaceholderDiskDef` Type
+
+Some OS versions are listed in the browser timeline but have no available disk image:
+
+```typescript
+export type PlaceholderDiskDef = {
+    type: "placeholder";
+    displayName: string;
+    displaySubtitle?: string;
+    releaseDate: [year: number, month: number, date: number];
+    description: string;
+    preferredMachine: MachineDef;
+    appearance?: Appearance;
+};
+```
+
+Examples include System 3.1 (caused data corruption), System 6.0.1 (buggy and short-lived), System 7.5.4 (withdrawn before release), Mac OS 9.0.1 (never released), and Mac OS 9.2/9.2.1 (no available images). Placeholders are shown in the timeline with a grayed-out appearance and a note explaining why no image is available.
+
+## URL Structure and Disk Collections
+
+The browser maps URLs of the form `/<year>/<displayName>` to entries in `DISKS_BY_YEAR`. The disk collections exported from `disks.ts` are:
+
+| Export | Contents |
+|---|---|
+| `DISKS_BY_YEAR` | All non-hidden disks keyed by release year |
+| `NOTABLE_DISKS_BY_YEAR` | Subset of notable disks, keyed by year |
+| `NEXT_DISKS` / `NEXT_DISKS_BY_YEAR` | Disks whose `preferredMachine.platform === "NeXT"` |
+| `MAC_OS_X_DISKS` / `MAC_OS_X_DISKS_BY_YEAR` | Disks with `infiniteHdSubset === "macosx"` |
+| `FLOPPY_DISKS` | Standalone floppy startup disks |
+| `SYSTEM_DISKS_BY_NAME` | All non-placeholder disks keyed by full display name |
+
+The `systemDiskName()` helper builds the lookup key:
+
+```typescript
+export function systemDiskName(disk: SystemDiskDef) {
+    return (
+        disk.displayName +
+        (disk.displaySubtitle ? " - " + disk.displaySubtitle : "")
+    );
+}
+```
+
+<Note>
+Disks with `hiddenInBrowser: true` are excluded from all `DISKS_BY_YEAR` collections and therefore from URL routing. They must be loaded by other means (e.g. direct programmatic access or a known URL parameter).
+</Note>
+
+## Auxiliary Disk Definitions
+
+Beyond system disks, `disks.ts` defines several `EmulatorDiskDef` objects used as supplementary mounts:
+
+| Export | Description |
+|---|---|
+| `INFINITE_HD` | The main software library for System 7–Mac OS 9 |
+| `INFINITE_HD6` | Software library subset for System 6 and earlier HFS |
+| `INFINITE_HDX` | Software library for Mac OS X (HFS+) |
+| `INFINITE_HD_MFS` | MFS floppy for early System 1–2 machines |
+| `INFINITE_HD_NEXT` | Software library for NeXTSTEP installations |
+| `SAVED_HD` | Persistent user disk stored in OPFS (`persistent: true`) |
+
+## System Disk Examples
+
+<Tabs>
+  <Tab title="Early Classic (MFS)">
+```typescript
+const SYSTEM_1_0: SystemDiskDef = {
+    displayName: "System 1.0",
+    description: "Initial system software release, shipped with the Mac 128K.",
+    releaseDate: [1984, 1, 24],
+    prefetchChunks: [0, 1],
+    preferredMachine: MAC_128K,
+    infiniteHdSubset: "mfs",
+    delayAdditionalDiskMount: true,
+    generatedSpec: () => import("@/Data/System 1.0.dsk.json"),
+    notable: true,
+    isFloppy: true,
+};
+```
+  </Tab>
+  <Tab title="System 7 Era">
+```typescript
+const SYSTEM_7_0: SystemDiskDef = {
+    displayName: "System 7.0",
+    description: "Fully 32-bit clean, the MultiFinder is now mandatory...",
+    releaseDate: [1991, 5, 13],
+    prefetchChunks: [0, 1, 2, 3, 4, 5, 6, 7, 8, 11, 12, ...],
+    preferredMachine: MAC_IIFX,
+    appleTalkSupported: true,
+    appearanceVariant: "System7",
+    generatedSpec: () => import("@/Data/System 7.0 HD.dsk.json"),
+    notable: true,
+};
+```
+  </Tab>
+  <Tab title="Mac OS X">
+```typescript
+const MAC_OS_X_10_4_11: SystemDiskDef = {
+    displayName: "Mac OS X 10.4",
+    displaySubtitle: "Tiger",
+    description: "Introduced Spotlight, Dashboard...",
+    releaseDate: [2005, 4, 29],
+    preferredMachine: POWER_MACINTOSH_G4_PEARPC,
+    appearance: "Aqua",
+    infiniteHdSubset: "macosx",
+    isUnstable: true,
+    hasDeviceImageHeader: true,
+    extraMachineFiles: dppcExtraMachineFiles,
+    notable: true,
+    generatedSpec: () => import("@/Data/Mac OS X 10.4.11 HD.dsk.json"),
+};
+```
+  </Tab>
+  <Tab title="NeXTSTEP">
+```typescript
+const NEXTSTEP_0_8: SystemDiskDef = {
+    displayName: "NeXTStep 0.8",
+    description: "First publicly-available preview release...",
+    releaseDate: [1988, 10, 12],
+    preferredMachine: NEXT_COMPUTER,
+    appearance: "NeXT",
+    notable: true,
+    generatedSpec: () => import("@/Data/NeXTStep 0.8 HD.dsk.json"),
+};
+```
+  </Tab>
+</Tabs>

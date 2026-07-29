@@ -1,0 +1,151 @@
+---
+title: "EmbedNotificationEvent: Events from Embedded Emulators"
+sidebarTitle: "Notification Events"
+description: "postMessage events emitted by an embedded Infinite Mac emulator: boot completion and frame-by-frame screen capture."
+---
+
+The `EmbedNotificationEvent` type, defined in [`src/embed-types.ts`](https://github.com/mihaip/infinite-mac/blob/main/src/embed-types.ts), describes every message payload the embedded emulator sends to the parent page via `postMessage`. Listen for these events on the `window` object of the parent page using the standard `"message"` event.
+
+## Receiving notification events
+
+Register a listener on `window` and inspect `event.data.type` to identify the notification:
+
+```javascript
+window.addEventListener('message', (event) => {
+  switch (event.data.type) {
+    case 'emulator_loaded':
+      console.log('Mac is running!');
+      break;
+    case 'emulator_screen':
+      // event.data.data   → Uint8ClampedArray of RGBA pixels
+      // event.data.width  → screen width in pixels
+      // event.data.height → screen height in pixels
+      break;
+  }
+});
+```
+
+---
+
+## `emulator_loaded`
+
+Fired exactly once, after the emulator has finished fetching all required data files and the emulated machine has begun executing. Before this event fires, the iframe renders a loading progress indicator.
+
+**No additional fields.**
+
+This event is the right moment to hide a custom loading overlay you may have rendered in the parent page, or to programmatically send an initial sequence of control events.
+
+```javascript
+window.addEventListener('message', (event) => {
+  if (event.data.type === 'emulator_loaded') {
+    document.getElementById('loading-overlay').style.display = 'none';
+    console.log('Emulator is ready.');
+  }
+});
+```
+
+---
+
+## `emulator_screen`
+
+Fired every time the contents of the emulated screen change. The payload carries raw RGBA pixel data that you can draw directly onto an HTML `<canvas>` element.
+
+<Warning>
+  `emulator_screen` events are **only emitted** when the iframe URL includes the
+  `screen_update_messages=true` query parameter. Without this parameter, no
+  screen events are sent regardless of the listener you attach. See
+  [URL Parameters](/reference/url-parameters) for details.
+</Warning>
+
+<ParamField query="data" type="Uint8ClampedArray">
+  Raw pixel data for the entire screen, in row-major order. Each pixel occupies
+  four consecutive bytes in RGBA order: red, green, blue, and alpha (opacity).
+  The total length of the array is `width × height × 4`.
+</ParamField>
+
+<ParamField query="width" type="number">
+  The width of the emulated screen in pixels.
+</ParamField>
+
+<ParamField query="height" type="number">
+  The height of the emulated screen in pixels.
+</ParamField>
+
+### Drawing to a canvas
+
+Pass `data`, `width`, and `height` directly to the `ImageData` constructor, then write the result to a canvas with `putImageData`:
+
+```javascript
+window.addEventListener('message', (event) => {
+  if (event.data.type !== 'emulator_screen') return;
+  const { data, width, height } = event.data;
+  const canvas = document.getElementById('screen-canvas');
+  const ctx = canvas.getContext('2d');
+  canvas.width = width;
+  canvas.height = height;
+  ctx.putImageData(new ImageData(data, width, height), 0, 0);
+});
+```
+
+### Complete example: off-screen canvas renderer
+
+The following self-contained example embeds Infinite Mac in an invisible iframe, captures every frame, and renders it onto a visible `<canvas>` element — useful for screenshot tools, streaming integrations, or custom overlays.
+
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Infinite Mac — Screen Capture Demo</title>
+</head>
+<body>
+  <!-- The iframe is sized to define the emulated screen resolution.
+       It does not need to be visible; set display:none if preferred. -->
+  <iframe
+    id="mac"
+    src="https://infinitemac.org/embed?machine=Quadra%20650&disk=System%207.5&screen_update_messages=true"
+    width="640"
+    height="480"
+    style="border: none;"
+  ></iframe>
+
+  <!-- Frames are painted here -->
+  <canvas id="screen-canvas" width="640" height="480"
+          style="display: block; border: 1px solid #333;"></canvas>
+
+  <script>
+    const canvas = document.getElementById('screen-canvas');
+    const ctx = canvas.getContext('2d');
+
+    window.addEventListener('message', (event) => {
+      switch (event.data.type) {
+        case 'emulator_loaded':
+          console.log('Emulator ready — screen frames will now arrive.');
+          break;
+
+        case 'emulator_screen': {
+          const { data, width, height } = event.data;
+          // Resize canvas if the emulated resolution changes
+          if (canvas.width !== width || canvas.height !== height) {
+            canvas.width = width;
+            canvas.height = height;
+          }
+          ctx.putImageData(new ImageData(data, width, height), 0, 0);
+          break;
+        }
+      }
+    });
+  </script>
+</body>
+</html>
+```
+
+<Tip>
+  When using `screen_update_messages=true` solely for periodic screen capture
+  (e.g. generating thumbnails), combine it with `emulator_pause` and
+  `emulator_unpause` control events to run the emulator only when a new frame is
+  needed. Pause the emulator after capturing each frame, then unpause briefly to
+  advance emulation and receive the next `emulator_screen` event. This
+  significantly reduces CPU usage compared to running the emulator at full speed
+  continuously.
+</Tip>
