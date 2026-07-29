@@ -1,5 +1,5 @@
 ---
-title: "Iframe URL Parameters for Embedded Emulators"
+title: "Infinite Mac Embed URL Parameters: Complete Reference"
 sidebarTitle: "URL Parameters"
 description: "Complete reference for every query parameter accepted by the /embed endpoint: disk selection, machine, screen size, scaling, storage, and control options."
 ---
@@ -144,7 +144,8 @@ Every embedded Infinite Mac emulator is configured through the query string of i
 
 <ParamField query="cdrom" type="string">
   URL to a CD-ROM image to mount at startup. Equivalent to `cdrom_url`. May be
-  repeated for multiple CD-ROMs. Not supported by DingusPPC or PearPC machines.
+  repeated for multiple CD-ROMs. Not supported by DingusPPC, PearPC, or Snow
+  machines that lack a SCSI bus.
 
   ```
   ?cdrom=https%3A%2F%2Fexample.com%2Fgame.iso

@@ -1,5 +1,5 @@
 ---
-title: "System Disk Definitions and Disk Types"
+title: "Infinite Mac Disk Types: SystemDiskDef and EmulatorDiskDef"
 sidebarTitle: "Disks"
 description: "Reference for SystemDiskDef, EmulatorDiskDef, and DiskFile types: display names, release dates, preferred machines, appearance, and Infinite HD subsets."
 ---
@@ -88,7 +88,7 @@ export type SystemDiskDef = EmulatorDiskDef & {
 
 **`appearance`** — The visual theme of the OS. One of `"Classic"` (pre-Mac OS 8 look), `"Platinum"` (Mac OS 8/9 Platinum appearance), `"Aqua"` (Mac OS X), or `"NeXT"`. Controls how the browser renders UI chrome around the emulated screen.
 
-**`appearanceVariant`** — A sub-variant of the appearance theme, e.g. `"System7"` for the transitional System 7.x look, or `"Pinstripes"` for the late-90s iMac era.
+**`appearanceVariant`** — A sub-variant of the appearance theme. Currently only `"System7"` is defined, used for the transitional System 7.x look within the `"Platinum"` appearance.
 
 **`notable`** — When `true`, the disk appears in the "Notable" filter in the browser. Notable disks represent historically significant releases: System 1.0, System 2.0, System 2.1, System 3.0, System 5.0, System 6.0, System 6.0.5, System 7.0, System 7.5, System 7.5.3, KanjiTalk 7.5.3, Mac OS 7.6, Mac OS 8.0, Mac OS 8.1, Mac OS 8.5, Mac OS 9.0, and every Mac OS X release.
 

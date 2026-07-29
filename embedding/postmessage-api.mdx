@@ -1,7 +1,7 @@
 ---
-title: "postMessage API for Embedded Emulator Control"
+title: "Infinite Mac postMessage API: Control and Notifications"
 sidebarTitle: "postMessage API"
-description: "Send commands to an embedded Infinite Mac emulator and receive status events using the browser's window.postMessage API."
+description: "Send commands to an embedded Infinite Mac emulator and receive live screen and status events using the browser's built-in window.postMessage API."
 ---
 
 The embedded Infinite Mac emulator supports two-way communication with the parent page through the browser's standard [`window.postMessage`](https://developer.mozilla.org/en-US/docs/Web/API/Window/postMessage) API. You can send control commands to the emulator (pause, keyboard/mouse input, disk loading) and listen for status notifications (boot complete, screen updates).
@@ -69,7 +69,7 @@ iframe.contentWindow.postMessage({ type: "emulator_unpause" }, "*");
 
 Send a mouse movement event. The coordinate semantics depend on the underlying emulator:
 
-- **Absolute coordinates** (`x`, `y`) — supported by Mini vMac, Basilisk II, and SheepShaver.
+- **Absolute coordinates** (`x`, `y`) — supported by Mini vMac, Basilisk II, SheepShaver, and Snow.
 - **Relative coordinates** (`deltaX`, `deltaY`) — used by Previous, DingusPPC, and PearPC.
 
 You should always supply all four fields; each emulator will read the ones it supports.
@@ -96,14 +96,14 @@ iframe.contentWindow.postMessage(
 
 ### `emulator_mouse_down` / `emulator_mouse_up`
 
-Send a mouse button press or release. `button` follows the same numbering as [`MouseEvent.button`](https://developer.mozilla.org/en-US/docs/Web/API/MouseEvent/button): `0` = left, `2` = right.
+Send a mouse button press or release. `button` follows the same numbering as [`MouseEvent.button`](https://developer.mozilla.org/en-US/docs/Web/API/MouseEvent/button): `0` = left, `1` = middle, `2` = right.
 
 Right-click (`button: 2`) is only supported by certain emulator and OS combinations — specifically Previous, and DingusPPC running Mac OS X.
 
 ```typescript
 {
   type: "emulator_mouse_down" | "emulator_mouse_up";
-  button: number;  // 0 = left, 2 = right
+  button: number;  // 0 = left, 1 = middle, 2 = right
 }
 ```
 
@@ -147,7 +147,7 @@ iframe.contentWindow.postMessage({ type: "emulator_key_up",   code: "KeyA" }, "*
 
 Load a disk image from a URL into the running emulator. The `url` must point to an uncompressed disk image file (`.dsk`, `.img`, `.iso`, `.toast`, etc.).
 
-Supported emulators: **Mini vMac, Basilisk II, SheepShaver, Previous**.
+Supported emulators: **Mini vMac, Basilisk II, SheepShaver, Previous, and Snow (machines with a SCSI bus)**. Not supported by DingusPPC or PearPC.
 
 ```typescript
 {

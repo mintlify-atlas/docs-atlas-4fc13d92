@@ -1,7 +1,7 @@
 ---
-title: "WebAssembly Emulator Cores Used by Infinite Mac"
+title: "Infinite Mac Emulator Cores: Types, CPUs, and Capabilities"
 sidebarTitle: "Emulator Types"
-description: "Capabilities and limitations of each emulator core: Mini vMac, Basilisk II, SheepShaver, DingusPPC, Previous, PearPC, and Snow."
+description: "Capabilities and limitations of all seven emulator cores in Infinite Mac: Mini vMac, Basilisk II, SheepShaver, DingusPPC, Previous, PearPC, and Snow."
 ---
 
 Infinite Mac runs seven distinct emulator cores in the browser as WebAssembly modules. Each core is compiled from the original C or Rust emulator source and wrapped in a common JavaScript interface. The right emulator is selected automatically based on the machine definition — you never configure this directly. Understanding which core is in use helps explain the differences in available features, mouse handling, networking support, and speed controls across different Mac and NeXT configurations.
@@ -41,7 +41,7 @@ The 68K values correspond to Motorola 68000-family CPUs used in all Macs from 19
 |---|---|---|---|---|---|---|---|
 | Mini vMac | 68000–68030 | ✗ | ✓ | ✗ | ✗ | ✗ | `MACEMU` |
 | Basilisk II | 68030–68040 | ✓ | ✓ | ✓ | ✗ | ✗ | `MACEMU` |
-| SheepShaver | 601, 604, G3 | ✓ | ✓ | ✓ | ✗ | ✗ | `MACEMU` |
+| SheepShaver | 601, 604, G3 | ✓ | ✓ | ✓ | ✗ | ✗ | — |
 | DingusPPC | 601, G3 | ✗ | ✗ (always rel.) | — | ✓ | ✓ | — |
 | Previous | 68030–68040 | ✗ | ✗ (always rel.) | — | ✓ | ✗ | — |
 | PearPC | G3 | ✗ | ✗ (always rel.) | — | ✓ | ✗ | — |
@@ -112,7 +112,7 @@ Each subtype compiles a different Mini vMac variant optimized for that specific 
 - **Placeholder disks**: Uses placeholder disk files (`emulatorUsesPlaceholderDisks` returns `true`), same behavior as Basilisk II.
 - **Debug log**: Not supported.
 - **BlueSCSI**: Not available.
-- **Speed control**: Uses the `MACEMU` speed config.
+- **Speed control**: None (`emulatorSpeedConfig` returns `undefined`).
 
 ---
 
@@ -221,7 +221,7 @@ The Snow speed values are kept in sync with the speed-handling code in `snow/fro
 Two speed configuration presets are used across the emulators:
 
 <Tabs>
-  <Tab title="MACEMU (Mini vMac, Basilisk II, SheepShaver)">
+  <Tab title="MACEMU (Mini vMac, Basilisk II)">
 ```typescript
 const MACEMU_SPEED_CONFIG: EmulatorSpeedConfig = {
     defaultSpeed: -2,

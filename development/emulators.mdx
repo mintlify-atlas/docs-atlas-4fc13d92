@@ -1,7 +1,7 @@
 ---
 title: "Building Emulator Cores from Source"
 sidebarTitle: "Emulators"
-description: "Rebuild any of the six WebAssembly emulator cores — Basilisk II, SheepShaver, Mini vMac, DingusPPC, Previous, PearPC, or Snow — using the Emscripten Docker image."
+description: "Rebuild any of the seven WebAssembly emulator cores — Basilisk II, SheepShaver, Mini vMac, DingusPPC, Previous, PearPC, or Snow — using the Emscripten Docker image."
 ---
 
 Infinite Mac runs classic Macintosh software through WebAssembly builds of several open-source emulator cores. The compiled `.wasm` and `.js` binaries are already checked into the repository under `src/emulator/worker/emscripten/`, so you only need to rebuild them if you are making changes to the emulator source itself. The build environment is fully containerised — a single Docker image bundles the Emscripten SDK, Rust toolchain, and all supporting libraries needed to compile every core.

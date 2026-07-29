@@ -1,7 +1,7 @@
 ---
 title: "EmbedNotificationEvent: Events from Embedded Emulators"
 sidebarTitle: "Notification Events"
-description: "postMessage events emitted by an embedded Infinite Mac emulator: boot completion and frame-by-frame screen capture."
+description: "postMessage events emitted by an embedded Infinite Mac emulator to the parent page: boot completion notification and per-frame screen RGBA pixel data."
 ---
 
 The `EmbedNotificationEvent` type, defined in [`src/embed-types.ts`](https://github.com/mihaip/infinite-mac/blob/main/src/embed-types.ts), describes every message payload the embedded emulator sends to the parent page via `postMessage`. Listen for these events on the `window` object of the parent page using the standard `"message"` event.

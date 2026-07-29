@@ -1,5 +1,5 @@
 ---
-title: "Transferring Files Into and Out of Infinite Mac"
+title: "Transferring Files Into and Out of Infinite Mac Emulator"
 sidebarTitle: "File Transfer"
 description: "Drag files into the Infinite Mac window to upload them, download files from the emulator as ZIP archives, and preserve HFS resource forks."
 ---
@@ -7,7 +7,7 @@ description: "Drag files into the Infinite Mac window to upload them, download f
 Infinite Mac supports two-way file transfer between the host browser and the emulated Mac. You can drag files from your desktop into the emulator window to copy them onto the Mac, and files saved to a special Downloads folder inside the Mac are made available for download on the host. Both directions respect classic Mac resource forks, using ZIP archives and AppleDouble metadata to carry the fork data across the browser boundary.
 
 <Note>
-  File drag-and-drop and the Downloads folder are only available on emulators that support them: **Basilisk II**, **SheepShaver**, and **DingusPPC** with BlueSCSI Toolbox enabled (the last of these presents files via "The Outside World" disk). Mini vMac, Previous, and PearPC do not support file transfer.
+  File drag-and-drop and the Downloads folder are only available on emulators that support them: **Basilisk II**, **SheepShaver**, **DingusPPC** with BlueSCSI Toolbox enabled, and **Snow** machines that have built-in SCSI support. The last two present files via "The Outside World" disk. Mini vMac, Previous, and PearPC do not support file transfer.
 </Note>
 
 ## Dragging files into the emulator
@@ -93,7 +93,7 @@ Click **Request Persistence** to ask the browser to promote transient storage to
 
 The **Macintosh Garden** library drawer (available in the emulator sidebar) lets you download software directly from [macintoshgarden.org](https://macintoshgarden.org/) into the running emulator without any manual file handling. Files are fetched through a proxy, progress is displayed inline, and the result is placed into the Downloads folder automatically.
 
-For Snow-based emulators that use BlueSCSI, files from the library are transferred via the BlueSCSI SD Transfer mechanism on "The Outside World" disk rather than the Downloads folder.
+For Snow-based emulators with SCSI support, files from the library are transferred via "The Outside World" disk rather than the Downloads folder.
 
 <Tip>
   If you need to pre-populate a disk image with content before deploying it, the `import-library` script (run via `npm run import-library`) builds the library metadata index from macintoshgarden.org. See the project README for details.

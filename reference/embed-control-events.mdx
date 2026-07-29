@@ -1,7 +1,7 @@
 ---
 title: "EmbedControlEvent: Commands for Embedded Emulators"
 sidebarTitle: "Control Events"
-description: "All postMessage event types you can send to an embedded Infinite Mac emulator: pause, mouse, keyboard, and disk loading commands."
+description: "All postMessage event types you can send to an embedded Infinite Mac emulator: pause, resume, mouse movement, keyboard input, and disk loading commands."
 ---
 
 The `EmbedControlEvent` type, defined in [`src/embed-types.ts`](https://github.com/mihaip/infinite-mac/blob/main/src/embed-types.ts), describes every message payload you can send to an embedded Infinite Mac iframe via the `postMessage` API. Each event carries a `type` field that identifies the command, plus any additional fields required by that command.
@@ -49,8 +49,7 @@ Sends a mouse movement event to the emulated machine. The emulator backend deter
 
 <ParamField query="x" type="number">
   Absolute X position in screen pixels. Used by emulators that support absolute
-  mouse coordinates: **Mini vMac**, **Basilisk II**, **SheepShaver**, and
-  **Snow**.
+  mouse coordinates: **Mini vMac**, **Basilisk II**, and **SheepShaver**.
 </ParamField>
 
 <ParamField query="y" type="number">
@@ -58,8 +57,10 @@ Sends a mouse movement event to the emulated machine. The emulator backend deter
 </ParamField>
 
 <ParamField query="deltaX" type="number">
-  Relative X delta in pixels. Used by emulators that only support relative mouse
-  input: **Previous**, **DingusPPC**, and **PearPC**.
+  Relative X delta in pixels. Used by emulators that require relative mouse
+  input: **Previous**, **DingusPPC**, and **PearPC**. Also used by
+  **Basilisk II**, **SheepShaver**, and **Snow** when the `useMouseDeltas`
+  setting is enabled.
 </ParamField>
 
 <ParamField query="deltaY" type="number">
@@ -70,9 +71,10 @@ Sends a mouse movement event to the emulated machine. The emulator backend deter
   You should always send all four fields in every `emulator_mouse_move` message.
   The active emulator backend picks the coordinate system it understands and
   ignores the other pair. For absolute-coordinate emulators (Mini vMac, Basilisk
-  II, SheepShaver, Snow) the `x`/`y` values are used; for relative-coordinate
+  II, SheepShaver) the `x`/`y` values are used; for relative-coordinate
   emulators (Previous, DingusPPC, PearPC) the `deltaX`/`deltaY` values are
-  used.
+  used. Basilisk II, SheepShaver, and Snow can optionally use relative
+  coordinates when `useMouseDeltas` is enabled in their settings.
 </Note>
 
 ```javascript

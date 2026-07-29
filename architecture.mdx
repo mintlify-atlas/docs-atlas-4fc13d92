@@ -1,5 +1,5 @@
 ---
-title: "How Infinite Mac Works: Architecture Overview"
+title: "Infinite Mac Architecture: WebAssembly, Workers, and R2"
 sidebarTitle: "Architecture"
 description: "Infinite Mac compiles classic Mac emulators to WebAssembly and serves them via Cloudflare Workers, with chunked disk images stored in Cloudflare R2."
 ---
@@ -164,6 +164,7 @@ infinite-mac/
 │   │   ├── Mac.tsx          # Running emulator view
 │   │   └── Custom.tsx       # /run custom configuration builder
 │   ├── controls/            # Reusable UI widgets (buttons, dialogs, inputs)
+│   ├── lib/                 # Shared utilities and hooks
 │   ├── defs/                # Type-safe data definitions
 │   │   ├── machines.ts      # MachineDef constants for every emulated model
 │   │   ├── disks.ts         # SystemDiskDef for every OS release

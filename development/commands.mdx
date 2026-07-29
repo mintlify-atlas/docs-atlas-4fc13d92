@@ -34,6 +34,14 @@ Starts a local Cloudflare Worker preview using `wrangler dev --port=3128`. The r
 
 ## Building
 
+### `build-tools`
+
+```bash
+npm run build-tools
+```
+
+Runs `scripts/build-tools.sh` to compile the native helper programs that the disk and library import scripts depend on. Run this once after `npm install` before using any of the `import-*` scripts.
+
 ### `build`
 
 ```bash
@@ -44,18 +52,16 @@ Runs `vite build` and outputs the compiled app into the `build/` directory. The 
 
 ## Importing Data
 
-### `import-disks [minimal|placeholder]`
+### `import-disks [minimal]`
 
 ```bash
 npm run import-disks
 npm run import-disks minimal
-npm run import-disks placeholder
 ```
 
 Builds disk images for serving. Copies base OS images for each supported emulator, chunks them, and generates a disk manifest. When run without arguments the full import runs, including populating the "Infinite HD" disk image from the `Library/` directory.
 
 - `minimal` — builds System 1 through System 7.5.5 only and skips populating Infinite HD, providing a fast path for development
-- `placeholder` — builds System 1 through 7.5.5 only (same as `minimal`); this flag name appears in the README as an alias for the fast subset
 
 <Info>
   This script calls the native macOS Mini vMac and Basilisk II binaries as a final step to validate the desktop database on the generated disk. If they are not installed, a warning is logged and the disk may take longer to mount in the emulator.
@@ -160,3 +166,21 @@ npm run format-macemu
 ```
 
 Runs `clang-format -i` over all files matching `macemu/BasiliskII/src/Unix/JS/*`, formatting the Basilisk II JavaScript glue files to the project's C/C++ style.
+
+## Utilities
+
+### `load-placeholder-stickies-file`
+
+```bash
+npm run load-placeholder-stickies-file
+```
+
+Runs `scripts/load-placeholder-stickies-file.py` via `uv run`. Injects a placeholder Stickies file into the generated disk image so that the Stickies application opens with sample notes. Used during development to verify that the Stickies injection pipeline works correctly.
+
+### `generate-local-ca-bundle`
+
+```bash
+npm run generate-local-ca-bundle
+```
+
+Runs `scripts/generate-local-ca-bundle.mjs` via Node. Generates a local CA certificate bundle used to support HTTPS in the development server (`npm run start`). Only needed when working on features that require a trusted TLS certificate locally.
